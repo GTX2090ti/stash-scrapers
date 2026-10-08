@@ -10,7 +10,7 @@ Personal Stash scrapers maintained by [@GTX2090ti](https://github.com/GTX2090ti)
 | **GetchuDL** | [dl.getchu.com](https://dl.getchu.com) | Scene & Gallery: name / URL / fragment / query-fragment. Full-text search on dl.getchu.com (EUC-JP encoding handled). |
 | **Getchu** | [www.getchu.com](https://www.getchu.com) | Scene: URL / fragment. **Physical goods** (DVD / Blu-ray / CD / games / doujin) — the counterpart to GetchuDL, which covers the digital-only dl.getchu.com. No name search (getchu's search endpoint 403s non-browser requests). Handles the R18 age gate and EUC-JP / JIS X 0213 decoding. Pure stdlib. |
 | **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment, covering both posts (`/posts/<id>`) and shop products (`/products/<id>`). Fragment-capable build — shows up in *Scrape with…* and supports batch. Optional CookieCloud login for members-only posts. |
-| **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene: name / URL / fragment / query-fragment; Performer: name / URL. Fragment-capable rewrite of the community `MissAV_en` / `MissAV_jp`. Parses **both** the `en` and `zh-CN` locales, falls back across mirrors, normalises stored URLs to the single host Stash's own HTTP client can reach, and fills in performers from the page's `Actress:` / `女优:` row (the community build's `og:video:actor` XPath no longer matches anything). Pure stdlib. |
+| **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene: name / URL / fragment / query-fragment; Performer: name / URL. Fragment-capable rewrite of the community `MissAV_en` / `MissAV_jp`. Parses **both** the `en` and `zh-CN` locales, cycles mirrors, normalises stored scene URLs, and fills in performers from the page's `Actress:` / `女优:` row (the community build's `og:video:actor` XPath no longer matches anything). Pure stdlib. |
 
 ## Install via Stash (recommended)
 
@@ -75,25 +75,32 @@ distinguishable from post ids. Proxy for fantia.jp uses the standard
 
 ## MissAV mirrors and the 403 trap
 
-MissAV runs several mirrors and they do **not** behave the same, so the script
-and Stash use different hosts on purpose:
+MissAV runs several mirrors and they do **not** all behave the same, so the yml
+declares both and the script cycles them:
 
 - **The script** prefers `missav.live` (~1 s) and falls back to `missav123.com`.
-- **Stash itself** can only reach `missav123.com`. `sceneByURL` matches by URL
-  prefix, and the matched URL is then fetched by Stash's own Go HTTP client —
-  not by the script. `missav.live` / `missav.ai` / `missav.ws` answer **HTTP 403**
-  to that client (TLS/JA3 fingerprint filtering; setting `scraperUserAgent` to a
-  browser UA does not help), while `missav123.com` returns 200.
+- `missav.live` answers **HTTP 403** to non-Python clients (TLS/JA3 fingerprint
+  filtering; setting `scraperUserAgent` to a browser UA does not help). That is
+  real, but it only matters for scrapers where **Stash fetches the page
+  itself** — i.e. `action: scrapeXPath`. It never reaches this scraper, because
+  every request here is made by Python, which clears the filter.
 
-Consequences:
+A tempting but wrong assumption is that `sceneByURL` makes Stash fetch the
+matched page. It does not: for `action: script` scrapers Stash only selects a
+scraper by URL prefix and then runs the script. Measured 2026-10-08 on
+Stash v0.31.1:
 
-- Stored scene URLs are normalised to `missav123.com`, so later re-scrapes do
-  not 403.
-- A pre-existing `missav.live` URL in your library will **not** match *Search by
-  URL*. Use *Scrape with…* instead — that path always works, because it goes
-  through the script.
-- Some mirrors are blocked or 403 for a given egress IP. Override the internal
-  list with `MISSAV_MIRRORS=missav.live,missav123.com`.
+| yml `urls` | URL scraped | result |
+|---|---|---|
+| `[missav123.com]` | `missav.live/...` | `Internal system error: index out of range [0] with length 0` — failed while *selecting* a scraper, before any fetch |
+| `[missav.live, missav123.com]` | `missav.live/...` | normal result |
+
+Both mirrors are therefore declared, and a library holding either URL form still
+matches *Search by URL*. Stored URLs are normalised to `missav123.com` purely so
+that one scene reached through two mirrors dedupes to a single URL.
+
+If a mirror is blocked or 403s for your egress IP, override the internal list
+with `MISSAV_MIRRORS=missav.live,missav123.com`.
 
 Performers are read from the page's `Actress:` (en) / `女优:` (zh-CN) row, plus
 `og:video:actor` when present — on `missav.live`'s `en` pages neither exists, so

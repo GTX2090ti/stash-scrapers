@@ -77,17 +77,18 @@ Site notes (all measured 2026-10; every one of these was a real bug first)
     whose Referer points at itself (403); a missing Referer, or one pointing at
     a missav host, returns 200.  See _headers().
 
-Mirrors and the canonical host (do not treat this as a tuning knob)
+Mirrors and the canonical host
 
-  * The script itself prefers missav.live (~1 s) and falls back to
-    missav123.com.
-  * URLs written to the database are always normalised to missav123.com, and so
-    is the yml's sceneByURL.  Reason: once sceneByURL matches a prefix, Stash
-    fetches that URL with *its own Go client*, not with this script.
-    missav.live / missav.ai / missav.ws answer 403 to Go (TLS/JA3 filtering,
-    unaffected by scraperUserAgent); only missav123.com passes.  In short:
-    missav.live works for this script but not for the Stash engine, so the two
-    entry points must use different hosts.
+  * The script prefers missav.live (~1 s) and falls back to missav123.com.  The
+    yml declares both, because sceneByURL only matches by URL prefix and then
+    hands the URL straight to this script.
+  * URLs written to the database are normalised to missav123.com.  The original
+    reason was a belief that Stash re-fetches stored URLs with its own Go client
+    -- to which missav.live answers 403 (TLS/JA3 filtering that scraperUserAgent
+    does not fix).  Measured 2026-10-08 on Stash v0.31.1: that belief is wrong
+    for action: script scrapers.  Stash never fetches the page; it selects a
+    scraper by prefix and runs the script.  The normalisation is kept, but only
+    so that one scene reached through two mirrors dedupes to a single URL.
 
 Environment:
   MISSAV_DEBUG=1       stderr diagnostics (silent by default -- Stash records

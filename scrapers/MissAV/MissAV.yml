@@ -29,20 +29,29 @@
 
 name: MissAV
 
-# Why sceneByURL lists missav123.com only:
-#   sceneByURL matches by URL prefix, and the matched URL is then fetched by
-#   Stash's own Go HTTP client -- not by this script.  Measured 2026-10-04 on
-#   Stash v0.31.1: missav.live / missav.ai / missav.ws answer HTTP 403 to Go
-#   regardless of scraperUserAgent, while missav123.com returns 200.  The main
-#   mirror applies TLS/JA3 fingerprint filtering that Python clears and Go does
-#   not.  So missav123.com is the only host that keeps the engine-level entry
-#   working; the script itself still prefers missav.live internally (see
-#   MISSAV_MIRRORS) because it is faster.
-#   Trade-off: a stored missav.live URL will not match "Search by URL"
-#   -- use "Scrape with ..." for those, which always works.
+# Why sceneByURL lists both mirrors:
+#   sceneByURL matches by URL prefix.  It is often assumed that Stash then
+#   fetches the matched page with its own Go HTTP client -- it does not.  For
+#   action: script scrapers Stash only *selects* the scraper and hands the URL
+#   to the script, which does its own fetching.  Measured 2026-10-08,
+#   Stash v0.31.1, scrapeSceneURL:
+#       urls: [missav123.com],           url = missav.live/... ->
+#           "Internal system error: index out of range [0] with length 0"
+#           -- it failed while selecting a scraper, before any page fetch;
+#       urls: [missav.live, missav123.com], url = missav.live/... ->
+#           normal result.
+#   The HTTP 403 that missav.live returns to non-Python clients is real, but it
+#   only affects scrapers where Stash fetches the page itself (action:
+#   scrapeXPath).  It never reaches this script, because the request here is
+#   made by Python.  So declare every mirror you want to match: a library
+#   holding either URL form then still hits "Search by URL".
+#   Stored URLs are nonetheless normalised to missav123.com (see
+#   parse_scene), so the same scene reached through two mirrors dedupes to one
+#   URL rather than two.
 sceneByURL:
   - action: script
     url:
+      - missav.live
       - missav123.com
     script:
       - python
@@ -80,6 +89,7 @@ performerByName:
 performerByURL:
   - action: script
     url:
+      - missav.live
       - missav123.com
     script:
       - python
