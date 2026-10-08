@@ -1,0 +1,46 @@
+name: GetchuDL
+sceneByName:
+  action: script
+  script:
+    - python
+    - GetchuDL.py
+    - sceneByName
+sceneByURL:
+  - action: script
+    url:
+      - dl.getchu.com/i/item
+      - dl.getchu.com/index.php?action=item
+      - getchu.com/soft.phtml
+    script:
+      - python
+      - GetchuDL.py
+      - sceneByURL
+sceneByQueryFragment:
+  action: script
+  script:
+    - python
+    - GetchuDL.py
+    - sceneByQueryFragment
+galleryByURL:
+  - action: script
+    url:
+      - dl.getchu.com/i/item
+      - dl.getchu.com/index.php?action=item
+      - getchu.com/soft.phtml
+    script:
+      - python
+      - GetchuDL.py
+      - galleryByURL
+sceneByFragment:
+  action: script
+  script:
+    - python
+    - GetchuDL.py
+    - sceneByFragment
+galleryByFragment:
+  action: script
+  script:
+    - python
+    - GetchuDL.py
+    - galleryByFragment
+# Last Updated September 15, 2026

@@ -1,0 +1,17 @@
+- id: avbase
+  name: avbase
+  version: 1.0.0
+  date: 2026-10-08
+  path: zips/avbase.zip
+  sha256: 6c6549d0f8027ca6dfd1901dd87d39a0066722629c01eb47e743339ce4967b74
+  metadata:
+    description: avbase.net aggregator scraper (getchu-priority multi-source). scene/gallery by name/url/fragment, performer by name/url.
+
+- id: GetchuDL
+  name: GetchuDL
+  version: 1.0.0
+  date: 2026-10-08
+  path: zips/GetchuDL.zip
+  sha256: 66f35e9c6a6731758cae8220fb6e69f17e751720aaf80b7e498a394d837d7e74
+  metadata:
+    description: dl.getchu.com scraper with name search. scene+gallery by name/url/fragment. Optional proxy via GetchuDL.proxy file or GETCHU_PROXY env.

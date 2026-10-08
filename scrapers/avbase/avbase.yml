@@ -1,0 +1,42 @@
+name: avbase
+sceneByURL:
+  - action: script
+    url:
+      - avbase.net/works/
+    script:
+      - python3
+      - avbase.py
+      - sceneByURL
+sceneByName:
+  action: script
+  script:
+    - python3
+    - avbase.py
+    - sceneByName
+sceneByFragment:
+  action: script
+  script:
+    - python3
+    - avbase.py
+    - sceneByFragment
+sceneByQueryFragment:
+  action: script
+  script:
+    - python3
+    - avbase.py
+    - sceneByQueryFragment
+performerByURL:
+  - action: script
+    url:
+      - avbase.net/talents/
+    script:
+      - python3
+      - avbase.py
+      - performerByURL
+performerByName:
+  action: script
+  script:
+    - python3
+    - avbase.py
+    - performerByName
+# Last Updated October 6, 2026
