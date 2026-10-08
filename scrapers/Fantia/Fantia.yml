@@ -1,0 +1,34 @@
+name: Fantia
+sceneByURL:
+  - action: script
+    url:
+      - fantia.jp/posts/
+      - fantia.jp/products/
+    script:
+      - python
+      - fantia.py
+      - post
+galleryByURL:
+  - action: script
+    url:
+      - fantia.jp/posts/
+    script:
+      - python
+      - fantia.py
+      - post
+# Upstream FantiaJp stops here -- and that is exactly why it never showed up
+# in the "Scrape with ..." menu: that menu only lists scrapers whose
+# supported_scrapes include FRAGMENT.  The two blocks below add it.
+sceneByFragment:
+  action: script
+  script:
+    - python
+    - fantia.py
+    - sceneByFragment
+galleryByFragment:
+  action: script
+  script:
+    - python
+    - fantia.py
+    - galleryByFragment
+# Last Updated September 14, 2026 (products page support)

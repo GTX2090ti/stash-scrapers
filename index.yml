@@ -15,3 +15,21 @@
   sha256: 66f35e9c6a6731758cae8220fb6e69f17e751720aaf80b7e498a394d837d7e74
   metadata:
     description: dl.getchu.com scraper with name search. scene+gallery by name/url/fragment. Optional proxy via GetchuDL.proxy file or GETCHU_PROXY env.
+
+- id: Fantia
+  name: Fantia
+  version: 1.0.0
+  date: 2026-10-08
+  path: zips/Fantia.zip
+  sha256: cad63f0e73368309dc57d6484f2a7ef28df3361086ad11e6caafaa7a302e3f69
+  metadata:
+    description: fantia.jp scraper, fragment-capable rewrite of the community FantiaJp. scene+gallery by URL/fragment (posts + shop products), tolerant of malformed post JSON. Optional CookieCloud login via CC_COOKIECLOUD_* env for members-only posts.
+
+- id: Getchu
+  name: Getchu
+  version: 1.0.0
+  date: 2026-10-08
+  path: zips/Getchu.zip
+  sha256: 1582b257da79cc0413753fa357e0a5b21d7c8a341953444547bc98e7b8ff4100
+  metadata:
+    description: www.getchu.com physical-goods scraper (DVD / Blu-ray / CD / games / doujin). scene by URL/fragment only; no name search (getchu's WAF blocks non-browser search). Handles the R18 age gate and EUC-JP / JIS X 0213 decoding. Proxy via standard HTTPS_PROXY / HTTP_PROXY env.

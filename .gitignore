@@ -1,0 +1,12 @@
+# --- Python caches ---
+__pycache__/
+*.pyc
+
+# --- Local credentials / runtime artefacts (never commit) ---
+.fantia_cookiecc.json
+fantia_cookie.txt
+cookies.txt
+GetchuDL.proxy
+Getchu.proxy
+*.proxy
+*.log

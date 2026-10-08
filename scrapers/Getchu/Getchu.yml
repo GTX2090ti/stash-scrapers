@@ -1,0 +1,32 @@
+# Getchu.com（www.getchu.com 实体商品页）刮削器
+#
+# 与 GetchuDL 的分工：
+#   GetchuDL  -> dl.getchu.com  （同人志 / 同人音声 的数字版，文件名即 id）
+#   Getchu    -> www.getchu.com（实体商品：DVD / Blu-ray / CD / 游戏 / 同人志等）
+#
+# ★ 只支持 URL 与 fragment 入口，不支持按名称搜索
+#   （getchu 站内搜索对非浏览器请求直接 403 / 返回空结果，已实测）。
+#   在 Stash 里请用 Metadata Providers → "Search by URL"，
+#   或对「已经存过 getchu URL 的条目」执行刮削。
+#
+# 部署：三个文件一起放进 Stash 的 scrapers 目录，然后 Reload scrapers。
+#   Getchu.py
+#   Getchu.yml
+#   Getchu.proxy   （可选；第一行写代理地址，如 http://192.168.2.210:7890）
+
+name: Getchu
+
+sceneByURL:
+  - action: script
+    url:
+      - www.getchu.com/item/
+      - www.getchu.com/soft.phtml
+      - ssl.getchu.com/soft.phtml
+      - getchu.com/item/
+    script: [python3, Getchu.py, sceneByURL]
+
+# ★ ByFragment 必须是「映射」，写成列表会让整份 yml 加载失败
+sceneByFragment:
+  action: script
+  script: [python3, Getchu.py, sceneByFragment]
+# Last Updated October 5, 2026
