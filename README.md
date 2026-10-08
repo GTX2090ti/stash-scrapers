@@ -1,5 +1,7 @@
 # stash-scrapers
 
+English | [简体中文](README.zh-CN.md)
+
 Personal Stash scrapers maintained by [@GTX2090ti](https://github.com/GTX2090ti).
 
 | Scraper | Site | Capabilities |
