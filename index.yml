@@ -1,7 +1,7 @@
 - id: avbase
   name: avbase
   version: 1.0.0
-  date: 2026-10-08
+  date: 2026-10-08 00:00:00
   path: zips/avbase.zip
   sha256: 6c6549d0f8027ca6dfd1901dd87d39a0066722629c01eb47e743339ce4967b74
   metadata:
@@ -10,7 +10,7 @@
 - id: GetchuDL
   name: GetchuDL
   version: 1.0.0
-  date: 2026-10-08
+  date: 2026-10-08 00:00:00
   path: zips/GetchuDL.zip
   sha256: 66f35e9c6a6731758cae8220fb6e69f17e751720aaf80b7e498a394d837d7e74
   metadata:
@@ -19,7 +19,7 @@
 - id: Fantia
   name: Fantia
   version: 1.0.0
-  date: 2026-10-08
+  date: 2026-10-08 00:00:00
   path: zips/Fantia.zip
   sha256: cad63f0e73368309dc57d6484f2a7ef28df3361086ad11e6caafaa7a302e3f69
   metadata:
@@ -28,7 +28,7 @@
 - id: Getchu
   name: Getchu
   version: 1.0.0
-  date: 2026-10-08
+  date: 2026-10-08 00:00:00
   path: zips/Getchu.zip
   sha256: 1582b257da79cc0413753fa357e0a5b21d7c8a341953444547bc98e7b8ff4100
   metadata:
@@ -37,7 +37,7 @@
 - id: MissAV
   name: MissAV
   version: 1.0.0
-  date: 2026-10-08
+  date: 2026-10-08 00:00:00
   path: zips/MissAV.zip
   sha256: 2ea4961ef4f40fb5c621edc90a3e993b11480858498678d97c305ad9f79d1dec
   metadata:
