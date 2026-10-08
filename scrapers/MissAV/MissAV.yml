@@ -1,0 +1,88 @@
+# MissAV scraper for Stash (action: script, pure Python stdlib)
+#
+# Why this exists instead of the community MissAV_en / MissAV_jp packages:
+#   1. Those are XPath-only (action: scrapeXPath), and an XPath scraper cannot
+#      declare a fragment entry -> "Scrape with ..." always answers
+#      "scraper operation not supported".  This package is action: script and
+#      declares four scene entries, so every UI action works.
+#   2. The community XPath build reads performers from
+#      //meta[@property="og:video:actor"] -- a tag that no longer exists on
+#      missav.live, so its Performers field is permanently empty.  This build
+#      reads the page's <span>Actress:</span> (EN) / <span>女优:</span> (CN) row
+#      and implements performerByURL / performerByName as well.
+#   3. Upstream has no mirror fallback; missav mirrors return 403 for some
+#      egress IPs.  This build cycles missav.live then missav123.com.
+#   4. Upstream only understands English labels, so the /cn/ locale parses to
+#      nothing.  The label table here is bilingual.
+#
+# Entry points:
+#   sceneByURL            -> Tagger "Search by URL" / scrapeURL prefix match
+#   sceneByQueryFragment  -> UI "Scrape with ..." with a pasted URL
+#                            (v0.31.1 routes this way, not via sceneByURL)
+#   sceneByFragment       -> UI "Scrape with ..." on an existing scene
+#                            (resolves the code from title / filename)
+#   sceneByName           -> search by name or code, returns candidates
+#   performerByURL        -> actress pages (/actresses/<Name>)
+#   performerByName       -> actress lookup, returns candidate performers
+#   * Declare all four scene entries: with only sceneByURL, pasting a URL into
+#     the UI reports "not supported".
+
+name: MissAV
+
+# Why sceneByURL lists missav123.com only:
+#   sceneByURL matches by URL prefix, and the matched URL is then fetched by
+#   Stash's own Go HTTP client -- not by this script.  Measured 2026-10-04 on
+#   Stash v0.31.1: missav.live / missav.ai / missav.ws answer HTTP 403 to Go
+#   regardless of scraperUserAgent, while missav123.com returns 200.  The main
+#   mirror applies TLS/JA3 fingerprint filtering that Python clears and Go does
+#   not.  So missav123.com is the only host that keeps the engine-level entry
+#   working; the script itself still prefers missav.live internally (see
+#   MISSAV_MIRRORS) because it is faster.
+#   Trade-off: a stored missav.live URL will not match "Search by URL"
+#   -- use "Scrape with ..." for those, which always works.
+sceneByURL:
+  - action: script
+    url:
+      - missav123.com
+    script:
+      - python
+      - missav.py
+      - sceneByURL
+
+sceneByQueryFragment:
+  action: script
+  script:
+    - python
+    - missav.py
+    - sceneByQueryFragment
+
+sceneByFragment:
+  action: script
+  script:
+    - python
+    - missav.py
+    - sceneByFragment
+
+sceneByName:
+  action: script
+  script:
+    - python
+    - missav.py
+    - sceneByName
+
+performerByName:
+  action: script
+  script:
+    - python
+    - missav.py
+    - performerByName
+
+performerByURL:
+  - action: script
+    url:
+      - missav123.com
+    script:
+      - python
+      - missav.py
+      - performerByURL
+# Last Updated October 8, 2026

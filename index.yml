@@ -33,3 +33,12 @@
   sha256: 1582b257da79cc0413753fa357e0a5b21d7c8a341953444547bc98e7b8ff4100
   metadata:
     description: www.getchu.com physical-goods scraper (DVD / Blu-ray / CD / games / doujin). scene by URL/fragment only; no name search (getchu's WAF blocks non-browser search). Handles the R18 age gate and EUC-JP / JIS X 0213 decoding. Proxy via standard HTTPS_PROXY / HTTP_PROXY env.
+
+- id: MissAV
+  name: MissAV
+  version: 1.0.0
+  date: 2026-10-08
+  path: zips/MissAV.zip
+  sha256: 2ea4961ef4f40fb5c621edc90a3e993b11480858498678d97c305ad9f79d1dec
+  metadata:
+    description: missav.live / missav123.com scraper, fragment-capable rewrite of the community MissAV_en / MissAV_jp. scene by URL / fragment / query-fragment / name; performer by URL / name. Bilingual label parsing (en + zh-CN locales), mirror fallback, and URL normalisation to the one host Stash's own HTTP client can reach. Optional proxy via MISSAV_PROXY env. Pure stdlib.
