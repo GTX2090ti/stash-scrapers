@@ -1,0 +1,64 @@
+name: FantiaProducts
+
+# fantia.jp/products/<id>  -- the SHOP namespace, distinct from
+# fantia.jp/posts/<id> (handled by the Fantia scraper).  One numeric id
+# points at two unrelated objects; /products/ is never a fallback for
+# /posts/ or vice versa.  See FantiaProducts.py for the live evidence table.
+#
+# Why this exists next to Fantia: Fantia covers both namespaces with one
+# entry point.  FantiaProducts is the products-only build with deeper field
+# extraction (schema.org Product block, unblurred image[], content_viewed
+# tag[] / fanclub_category, catalogue-code detection).  Prefer it when your
+# library is products-driven; either one works for members-only products
+# once CookieCloud is configured.
+#
+# These three entries are all needed on Stash 0.31.1:
+#   sceneByURL             UI "Search by URL" / Tagger URL search
+#   sceneByQueryFragment   UI "Scrape with ... <scraper>" + URL
+#                          (scene_input{url} routes here, NOT to sceneByURL)
+#   sceneByFragment        UI "Scrape with ..." on a scene with no stored URL
+#                          (scene_id -> the scene's own fields, e.g. title=887480)
+# An XPath scraper can declare none of the fragment ones, which is exactly why
+# the old scrapeXPath version answered "scraper operation not supported".
+
+sceneByURL:
+  - action: script
+    url:
+      - fantia.jp/products/
+    script:
+      - python
+      - FantiaProducts.py
+      - sceneByURL
+
+sceneByQueryFragment:
+  action: script
+  script:
+    - python
+    - FantiaProducts.py
+    - sceneByQueryFragment
+
+sceneByFragment:
+  action: script
+  script:
+    - python
+    - FantiaProducts.py
+    - sceneByFragment
+
+# CookieCloud login (members-only products)
+# --------------------------------------------------
+# fantia.jp answers an anonymous request for a members-only product with the
+# LOGIN page (HTTP 200, og:title "ログイン|ファンティア[Fantia]"), which used
+# to make every member product scrape as a silent failure.  Configure one of:
+#   1. env FANTIA_COOKIE='_session_id=...' on the Stash container
+#   2. self-hosted CookieCloud via CC_COOKIECLOUD_URL / _KEY / _PASSWORD
+# The CookieCloud request is deliberately proxy-free (the server is on the
+# LAN); scraping fantia.jp itself still honours FANTIAPROD_PROXY /
+# HTTPS_PROXY / HTTP_PROXY / ALL_PROXY, or a FantiaProducts.proxy file.
+# Cookies are cached in-process and on disk for CC_TTL seconds (default 3600).
+
+# Last Updated October 19, 2026
+#  - CookieCloud login support (FANTIA_COOKIE env or CC_COOKIECLOUD_* env),
+#    with in-process + on-disk caching; members-only products now scrape
+#  - Code no longer falls back to the whole og:title when 【...】 is absent
+#  - Tags no longer leak the raw content_viewed blob when "tag" is absent
+#  - fragment / query-fragment entries so the Stash UI can reach it

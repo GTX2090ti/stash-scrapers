@@ -10,6 +10,7 @@
 | **GetchuDL** | [dl.getchu.com](https://dl.getchu.com) | Scene & Gallery：名称 / URL / Fragment / 查询 Fragment。dl.getchu.com 全文搜索（自动处理 EUC-JP 编码）。 |
 | **Getchu** | [www.getchu.com](https://www.getchu.com) | Scene：URL / Fragment。**实体商品**（DVD / Blu-ray / CD / 游戏 / 同人等）—— 与覆盖纯数字版 dl.getchu.com 的 GetchuDL 互补。**不支持按名称搜索**（站内搜索对非浏览器请求直接 403）。处理 R18 年龄门与 EUC-JP / JIS X 0213 解码。纯标准库。 |
 | **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment，同时覆盖投稿（`/posts/<id>`）与商店商品（`/products/<id>`）。Fragment 增强版 —— 会出现在 *Scrape with…* 菜单并支持批量。会员限定投稿需可选地配置 CookieCloud 登录。 |
+| **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment / 查询 Fragment，**只处理商店商品命名空间**（`/products/<id>`）。products 专用版，字段提取更深（schema.org `Product`、未模糊的 `image[]`、`content_viewed` 的 `tag[]` / `fanclub_category`、商品编号识别），code 为 `FANTIA-P<id>`，与投稿 id 永不冲突。会员限定商品需可选地配置 CookieCloud 登录。 |
 | **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene：名称 / URL / Fragment / 查询 Fragment；Performer：名称 / URL。社区版 `MissAV_en` / `MissAV_jp` 的 Fragment 增强重写。**同时解析 `en` 与 `zh-CN` 两种语言站点**，跨镜像轮询，存库 scene URL 统一归一，并从页面 `Actress:` / `女优:` 行补齐演员（社区版的 `og:video:actor` XPath 已匹配不到任何东西）。纯标准库。 |
 
 ## 通过 Stash 安装（推荐）
@@ -22,7 +23,7 @@
    https://raw.githubusercontent.com/GTX2090ti/stash-scrapers/main/index.yml
    ```
 
-4. 点进该来源，对 `avbase` / `GetchuDL` / `Getchu` / `Fantia` / `MissAV` 点 **Install**
+4. 点进该来源，对 `avbase` / `GetchuDL` / `Getchu` / `Fantia` / `FantiaProducts` / `MissAV` 点 **Install**
 
 削刮器会安装到 `scrapers/<id>/` 子目录，之后可直接在 UI 里升级。
 
@@ -36,6 +37,7 @@
 - [`scrapers/GetchuDL/GetchuDL.yml`](scrapers/GetchuDL/GetchuDL.yml) + [`GetchuDL.py`](scrapers/GetchuDL/GetchuDL.py)
 - [`scrapers/Getchu/Getchu.yml`](scrapers/Getchu/Getchu.yml) + [`Getchu.py`](scrapers/Getchu/Getchu.py)
 - [`scrapers/Fantia/Fantia.yml`](scrapers/Fantia/Fantia.yml) + [`fantia.py`](scrapers/Fantia/fantia.py)
+- [`scrapers/FantiaProducts/FantiaProducts.yml`](scrapers/FantiaProducts/FantiaProducts.yml) + [`FantiaProducts.py`](scrapers/FantiaProducts/FantiaProducts.py)
 - [`scrapers/MissAV/MissAV.yml`](scrapers/MissAV/MissAV.yml) + [`missav.py`](scrapers/MissAV/missav.py)
 
 然后在 Settings 里点 **Reload scrapers**。
@@ -60,6 +62,10 @@ dl.getchu.com 与 www.getchu.com 在大陆网络均无法直连。
 Fantia 会隐藏会员限定投稿 —— `/api/v1/posts/<id>` 对当前 session 不可见的内容一律返回 HTTP 422（已删除、会员限定、未登录，Fantia 不作区分）。`fantia.py` 按以下优先级获取 session cookie：`FANTIA_COOKIE` 环境变量 → 脚本同目录的 `fantia_cookie.txt`（原始串或 Netscape `cookies.txt` 格式）→ **CookieCloud**（自建，实时拉取，缓存 1 小时）。在 Stash 进程所在环境设置 `CC_COOKIECLOUD_URL` / `CC_COOKIECLOUD_KEY` / `CC_COOKIECLOUD_PASSWORD` 即可启用 CookieCloud 通路。完全不配 cookie 时只能刮到真正公开的投稿。
 
 商店商品（`fantia.jp/products/<id>`）的 code 为 `FANTIA-P<id>`，以免与投稿 id 混淆。fantia.jp 走标准 `HTTPS_PROXY` / `HTTP_PROXY` 环境变量代理；CookieCloud 请求始终绕过代理。
+
+`FantiaProducts.py` 用同样的 cookie 来源（`FANTIA_COOKIE` 环境变量 → CookieCloud 的 `CC_COOKIECLOUD_*`），进程内 + 磁盘缓存 `CC_TTL` 秒（默认 3600）。在 products 这一侧这件事比听起来重要：fantia.jp 对**匿名**请求会员限定商品时返回的是**登录页**（HTTP 200，但没有 schema.org `Product` 块），此前表现为每个会员商品都"削刮失败"且毫无提示。代理解析顺序：`FANTIAPROD_PROXY` → `FantiaProducts.proxy` 文件 → 标准代理环境变量 → 直连。
+
+**`Fantia` 与 `FantiaProducts` 怎么选：** `Fantia` 一个入口同时覆盖两个命名空间；`FantiaProducts` 只合成 `/products/` URL（裸数字本身是二义的 —— 同一个 id 指向两个无关对象），但商品字段提取更细。以商品为主的库用 `FantiaProducts`，同时也要刮投稿就用 `Fantia`。两个都装没问题，每次刮削时在 *Scrape with…* 菜单里选即可。
 
 ## MissAV 的镜像与 403 陷阱
 
@@ -90,6 +96,7 @@ MissAV 有多个镜像，行为**并不一致**，所以 yml 把两个都声明�
 - `GetchuDL.py`：如在墙内，按上文说明配置代理
 - `Getchu.py`：纯标准库，无需额外配置；如在墙内设置 `HTTPS_PROXY` / `HTTP_PROXY`。仅支持 URL / Fragment 入口，**没有名称搜索**
 - `fantia.py`：除 `requests` 外无需额外依赖；如需会员内容按上文配置 CookieCloud。其余均为标准库（CookieCloud 客户端内置纯 Python AES 兜底，不需要额外的加密库）
+- `FantiaProducts.py`：纯标准库，无需额外配置。CookieCloud 登录与 `fantia.py` 相同；如在墙内设置 `FANTIAPROD_PROXY`（或标准代理环境变量）
 - `missav.py`：纯标准库，无需额外配置；如在墙内设置 `MISSAV_PROXY`（或标准代理环境变量）
 
 ## 版本管理

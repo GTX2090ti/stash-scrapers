@@ -10,6 +10,7 @@ Personal Stash scrapers maintained by [@GTX2090ti](https://github.com/GTX2090ti)
 | **GetchuDL** | [dl.getchu.com](https://dl.getchu.com) | Scene & Gallery: name / URL / fragment / query-fragment. Full-text search on dl.getchu.com (EUC-JP encoding handled). |
 | **Getchu** | [www.getchu.com](https://www.getchu.com) | Scene: URL / fragment. **Physical goods** (DVD / Blu-ray / CD / games / doujin) — the counterpart to GetchuDL, which covers the digital-only dl.getchu.com. No name search (getchu's search endpoint 403s non-browser requests). Handles the R18 age gate and EUC-JP / JIS X 0213 decoding. Pure stdlib. |
 | **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment, covering both posts (`/posts/<id>`) and shop products (`/products/<id>`). Fragment-capable build — shows up in *Scrape with…* and supports batch. Optional CookieCloud login for members-only posts. |
+| **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment / query-fragment, **products namespace only** (`/products/<id>`). The products-specialised build: deeper field extraction (schema.org `Product`, unblurred `image[]`, `content_viewed` `tag[]` / `fanclub_category`, catalogue-code detection) and code `FANTIA-P<id>` that never collides with post ids. Optional CookieCloud login for members-only products. |
 | **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene: name / URL / fragment / query-fragment; Performer: name / URL. Fragment-capable rewrite of the community `MissAV_en` / `MissAV_jp`. Parses **both** the `en` and `zh-CN` locales, cycles mirrors, normalises stored scene URLs, and fills in performers from the page's `Actress:` / `女优:` row (the community build's `og:video:actor` XPath no longer matches anything). Pure stdlib. |
 
 ## Install via Stash (recommended)
@@ -22,7 +23,7 @@ Personal Stash scrapers maintained by [@GTX2090ti](https://github.com/GTX2090ti)
    https://raw.githubusercontent.com/GTX2090ti/stash-scrapers/main/index.yml
    ```
 
-4. Click the source, then **Install** next to `avbase` / `GetchuDL` / `Getchu` / `Fantia` / `MissAV`
+4. Click the source, then **Install** next to `avbase` / `GetchuDL` / `Getchu` / `Fantia` / `FantiaProducts` / `MissAV`
 
 Scrapers install into `scrapers/<id>/` subdirectories and are managed/upgradable from the UI.
 
@@ -38,6 +39,7 @@ Download the scraper files and place them in your Stash `scrapers/` directory:
 - [`scrapers/GetchuDL/GetchuDL.yml`](scrapers/GetchuDL/GetchuDL.yml) + [`GetchuDL.py`](scrapers/GetchuDL/GetchuDL.py)
 - [`scrapers/Getchu/Getchu.yml`](scrapers/Getchu/Getchu.yml) + [`Getchu.py`](scrapers/Getchu/Getchu.py)
 - [`scrapers/Fantia/Fantia.yml`](scrapers/Fantia/Fantia.yml) + [`fantia.py`](scrapers/Fantia/fantia.py)
+- [`scrapers/FantiaProducts/FantiaProducts.yml`](scrapers/FantiaProducts/FantiaProducts.yml) + [`FantiaProducts.py`](scrapers/FantiaProducts/FantiaProducts.py)
 - [`scrapers/MissAV/MissAV.yml`](scrapers/MissAV/MissAV.yml) + [`missav.py`](scrapers/MissAV/missav.py)
 
 Then click **Reload scrapers** in Settings.
@@ -72,6 +74,22 @@ posts scrape.
 Shop products (`fantia.jp/products/<id>`) carry code `FANTIA-P<id>` to stay
 distinguishable from post ids. Proxy for fantia.jp uses the standard
 `HTTPS_PROXY` / `HTTP_PROXY` env vars; CookieCloud requests always bypass it.
+
+`FantiaProducts.py` reads the same cookie sources (`FANTIA_COOKIE` env var →
+CookieCloud via `CC_COOKIECLOUD_*`), cached in-process and on disk for `CC_TTL`
+seconds (default 3600). On the products side this matters more than it sounds:
+fantia.jp answers an **anonymous** request for a members-only product with the
+**login page** (HTTP 200, no schema.org `Product` block), which used to surface
+as a silent "scrape failed" for every member product. Proxy resolution for it is
+`FANTIAPROD_PROXY` → a `FantiaProducts.proxy` file → the standard env vars →
+direct.
+
+**`Fantia` vs `FantiaProducts`:** `Fantia` covers both namespaces behind one
+entry point; `FantiaProducts` only ever synthesises `/products/` URLs (a bare
+number is genuinely ambiguous — the same id points at two unrelated objects) and
+extracts product fields more thoroughly. Use `FantiaProducts` for a
+products-driven library, `Fantia` when you also scrape posts. Installing both is
+fine; pick per scrape in the *Scrape with…* menu.
 
 ## MissAV mirrors and the 403 trap
 
@@ -121,6 +139,9 @@ Proxy: `MISSAV_PROXY` (scraper only), else the standard `HTTPS_PROXY` /
 - `fantia.py`: no extra setup beyond `requests`; optional CookieCloud login as
   described above. Everything else is stdlib (the CookieCloud client ships a
   pure-Python AES fallback, no extra crypto packages)
+- `FantiaProducts.py`: pure stdlib, no extra setup. Same optional CookieCloud
+  login as `fantia.py`; set `FANTIAPROD_PROXY` (or the standard proxy env vars)
+  if you are behind the GFW
 - `missav.py`: pure stdlib, no extra setup. Set `MISSAV_PROXY` (or the standard
   proxy env vars) if you are behind the GFW
 

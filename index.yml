@@ -25,6 +25,15 @@
   metadata:
     description: fantia.jp scraper, fragment-capable rewrite of the community FantiaJp. scene+gallery by URL/fragment (posts + shop products), tolerant of malformed post JSON. Optional CookieCloud login via CC_COOKIECLOUD_* env for members-only posts.
 
+- id: FantiaProducts
+  name: FantiaProducts
+  version: 1.0.0
+  date: 2026-10-19 15:55:39
+  path: zips/FantiaProducts.zip
+  sha256: 8594d1e1e02031deb64ad48406573df5d2ccf48f214332b0de86db32fa7e69b8
+  metadata:
+    description: fantia.jp/products scraper (the shop namespace, distinct from /posts/). Products-only build with deeper field extraction (schema.org Product, unblurred image[], content_viewed tag[]/fanclub_category, catalogue-code detection). scene+gallery by URL/fragment/query-fragment. Optional CookieCloud login via FANTIA_COOKIE or CC_COOKIECLOUD_* env for members-only products.
+
 - id: Getchu
   name: Getchu
   version: 1.0.0
