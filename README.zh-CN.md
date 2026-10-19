@@ -9,7 +9,7 @@
 | **avbase** | [avbase.net](https://www.avbase.net) | Scene：名称 / URL / Fragment / 查询 Fragment；Performer：名称 / URL。聚合 fanza / getchu / gyutto 多来源，**getchu 优先、gyutto 回退**（字段级回退链）。 |
 | **GetchuDL** | [dl.getchu.com](https://dl.getchu.com) | Scene & Gallery：名称 / URL / Fragment / 查询 Fragment。dl.getchu.com 全文搜索（自动处理 EUC-JP 编码）。 |
 | **Getchu** | [www.getchu.com](https://www.getchu.com) | Scene：URL / Fragment。**实体商品**（DVD / Blu-ray / CD / 游戏 / 同人等）—— 与覆盖纯数字版 dl.getchu.com 的 GetchuDL 互补。**不支持按名称搜索**（站内搜索对非浏览器请求直接 403）。处理 R18 年龄门与 EUC-JP / JIS X 0213 解码。纯标准库。 |
-| **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment，同时覆盖投稿（`/posts/<id>`）与商店商品（`/products/<id>`）。Fragment 增强版 —— 会出现在 *Scrape with…* 菜单并支持批量。会员限定投稿需可选地配置 CookieCloud 登录。 |
+| **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment，处理**投稿**（`/posts/<id>`）。Fragment 增强版 —— 会出现在 *Scrape with…* 菜单并支持批量。自 **v1.1.0** 起只认投稿命名空间，因此对商品 URL 做 *Search by URL* 时会自动路由到 **FantiaProducts**，不再撞车。会员限定投稿需可选地配置 CookieCloud 登录。 |
 | **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment / 查询 Fragment，**只处理商店商品命名空间**（`/products/<id>`）。products 专用版，字段提取更深（schema.org `Product`、未模糊的 `image[]`、`content_viewed` 的 `tag[]` / `fanclub_category`、商品编号识别），code 为 `FANTIA-P<id>`，与投稿 id 永不冲突。会员限定商品需可选地配置 CookieCloud 登录。 |
 | **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene：名称 / URL / Fragment / 查询 Fragment；Performer：名称 / URL。社区版 `MissAV_en` / `MissAV_jp` 的 Fragment 增强重写。**同时解析 `en` 与 `zh-CN` 两种语言站点**，跨镜像轮询，存库 scene URL 统一归一，并从页面 `Actress:` / `女优:` 行补齐演员（社区版的 `og:video:actor` XPath 已匹配不到任何东西）。纯标准库。 |
 
@@ -65,7 +65,14 @@ Fantia 会隐藏会员限定投稿 —— `/api/v1/posts/<id>` 对当前 session
 
 `FantiaProducts.py` 用同样的 cookie 来源（`FANTIA_COOKIE` 环境变量 → CookieCloud 的 `CC_COOKIECLOUD_*`），进程内 + 磁盘缓存 `CC_TTL` 秒（默认 3600）。在 products 这一侧这件事比听起来重要：fantia.jp 对**匿名**请求会员限定商品时返回的是**登录页**（HTTP 200，但没有 schema.org `Product` 块），此前表现为每个会员商品都"削刮失败"且毫无提示。代理解析顺序：`FANTIAPROD_PROXY` → `FantiaProducts.proxy` 文件 → 标准代理环境变量 → 直连。
 
-**`Fantia` 与 `FantiaProducts` 怎么选：** `Fantia` 一个入口同时覆盖两个命名空间；`FantiaProducts` 只合成 `/products/` URL（裸数字本身是二义的 —— 同一个 id 指向两个无关对象），但商品字段提取更细。以商品为主的库用 `FantiaProducts`，同时也要刮投稿就用 `Fantia`。两个都装没问题，每次刮削时在 *Scrape with…* 菜单里选即可。
+**`Fantia` 与 `FantiaProducts` 怎么分工：** 两者分别负责 fantia.jp 用同一个数字 id 挂着的两个命名空间，自 **v1.1.0** 起不再重叠：
+
+| URL | 路由到 | 原因 |
+|---|---|---|
+| `fantia.jp/posts/<id>` | **Fantia** | 走 JSON API（`/api/v1/posts/<id>`），容错畸形投稿 JSON |
+| `fantia.jp/products/<id>` | **FantiaProducts** | HTML 抓取，字段提取更深（schema.org `Product`、未模糊的 `image[]`、`content_viewed` 的 `tag[]` / `fanclub_category`、商品编号识别） |
+
+拆分之前两个 yml 都声明了 `fantia.jp/products/`，商品 URL 会匹配到 Stash 恰好挑中的那个 —— 这也是会员商品有时只填了一半字段的原因。`Fantia` 仍可通过 fragment 入口（或手动 *Scrape with… Fantia*）接受商品 URL，因为 `fantia.py` 本身就能读 `/products/`；只是不再参与 URL 路由的竞争。
 
 ## MissAV 的镜像与 403 陷阱
 

@@ -18,12 +18,12 @@
 
 - id: Fantia
   name: Fantia
-  version: 1.0.0
-  date: 2026-10-08 00:00:00
+  version: 1.1.0
+  date: 2026-10-19 18:01:33
   path: zips/Fantia.zip
-  sha256: cad63f0e73368309dc57d6484f2a7ef28df3361086ad11e6caafaa7a302e3f69
+  sha256: 92bc21f5003899faa4fa9355c30aa0b81c82453b150c24f971d5e0bf0c9922bb
   metadata:
-    description: fantia.jp scraper, fragment-capable rewrite of the community FantiaJp. scene+gallery by URL/fragment (posts + shop products), tolerant of malformed post JSON. Optional CookieCloud login via CC_COOKIECLOUD_* env for members-only posts.
+    description: fantia.jp scraper, fragment-capable rewrite of the community FantiaJp. scene+gallery by URL/fragment, tolerant of malformed post JSON. Since v1.1.0 it claims the posts namespace (fantia.jp/posts/) only, so product URLs route to the FantiaProducts package; its fragment entries still accept a product URL manually. Optional CookieCloud login via CC_COOKIECLOUD_* env for members-only posts.
 
 - id: FantiaProducts
   name: FantiaProducts

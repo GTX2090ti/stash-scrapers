@@ -1,9 +1,20 @@
 name: Fantia
+
+# Division of labour with FantiaProducts (2026-10-19)
+# -----------------------------------------------------
+#   Fantia         -> fantia.jp/posts/<id>     creator posts, JSON API
+#   FantiaProducts -> fantia.jp/products/<id>  shop products, HTML, deeper extraction
+#
+# Both files used to declare fantia.jp/products/ under sceneByURL, so a URL
+# search for a product matched whichever of the two Stash happened to pick.
+# Fantia now claims posts only, which makes product URLs route to
+# FantiaProducts automatically.  The fragment entries below are deliberately
+# kept: "Scrape with ... Fantia" remains a working manual fallback, because
+# fantia.py can still read a /products/ URL on its own.
 sceneByURL:
   - action: script
     url:
       - fantia.jp/posts/
-      - fantia.jp/products/
     script:
       - python
       - fantia.py
@@ -31,4 +42,4 @@ galleryByFragment:
     - python
     - fantia.py
     - galleryByFragment
-# Last Updated September 14, 2026 (products page support)
+# Last Updated October 19, 2026 (URL split: posts here, products in FantiaProducts)

@@ -9,7 +9,7 @@ Personal Stash scrapers maintained by [@GTX2090ti](https://github.com/GTX2090ti)
 | **avbase** | [avbase.net](https://www.avbase.net) | Scene: name / URL / fragment / query-fragment; Performer: name / URL. Aggregates fanza / getchu / gyutto sources with **getchu-first, gyutto-fallback** priority (field-level fallback chain). |
 | **GetchuDL** | [dl.getchu.com](https://dl.getchu.com) | Scene & Gallery: name / URL / fragment / query-fragment. Full-text search on dl.getchu.com (EUC-JP encoding handled). |
 | **Getchu** | [www.getchu.com](https://www.getchu.com) | Scene: URL / fragment. **Physical goods** (DVD / Blu-ray / CD / games / doujin) — the counterpart to GetchuDL, which covers the digital-only dl.getchu.com. No name search (getchu's search endpoint 403s non-browser requests). Handles the R18 age gate and EUC-JP / JIS X 0213 decoding. Pure stdlib. |
-| **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment, covering both posts (`/posts/<id>`) and shop products (`/products/<id>`). Fragment-capable build — shows up in *Scrape with…* and supports batch. Optional CookieCloud login for members-only posts. |
+| **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment for **creator posts** (`/posts/<id>`). Fragment-capable build — shows up in *Scrape with…* and supports batch. Since **v1.1.0** it claims the posts namespace only, so `Search by URL` on a product routes to **FantiaProducts** instead of colliding with it. Optional CookieCloud login for members-only posts. |
 | **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment / query-fragment, **products namespace only** (`/products/<id>`). The products-specialised build: deeper field extraction (schema.org `Product`, unblurred `image[]`, `content_viewed` `tag[]` / `fanclub_category`, catalogue-code detection) and code `FANTIA-P<id>` that never collides with post ids. Optional CookieCloud login for members-only products. |
 | **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene: name / URL / fragment / query-fragment; Performer: name / URL. Fragment-capable rewrite of the community `MissAV_en` / `MissAV_jp`. Parses **both** the `en` and `zh-CN` locales, cycles mirrors, normalises stored scene URLs, and fills in performers from the page's `Actress:` / `女优:` row (the community build's `og:video:actor` XPath no longer matches anything). Pure stdlib. |
 
@@ -84,12 +84,19 @@ as a silent "scrape failed" for every member product. Proxy resolution for it is
 `FANTIAPROD_PROXY` → a `FantiaProducts.proxy` file → the standard env vars →
 direct.
 
-**`Fantia` vs `FantiaProducts`:** `Fantia` covers both namespaces behind one
-entry point; `FantiaProducts` only ever synthesises `/products/` URLs (a bare
-number is genuinely ambiguous — the same id points at two unrelated objects) and
-extracts product fields more thoroughly. Use `FantiaProducts` for a
-products-driven library, `Fantia` when you also scrape posts. Installing both is
-fine; pick per scrape in the *Scrape with…* menu.
+**`Fantia` vs `FantiaProducts`:** they cover the two namespaces that fantia.jp
+puts behind one numeric id, and since **v1.1.0** the two no longer overlap:
+
+| URL | Routed to | Why |
+|---|---|---|
+| `fantia.jp/posts/<id>` | **Fantia** | JSON API (`/api/v1/posts/<id>`), tolerant of malformed post JSON |
+| `fantia.jp/products/<id>` | **FantiaProducts** | HTML scrape with deeper field extraction (schema.org `Product`, unblurred `image[]`, `content_viewed` `tag[]` / `fanclub_category`, catalogue-code detection) |
+
+Before the split both ymls declared `fantia.jp/products/`, so a product URL
+matched whichever scraper Stash happened to pick — which is why member products
+sometimes came back half-filled. `Fantia` still accepts a product URL through its
+fragment entries (or a manual *Scrape with… Fantia*), since `fantia.py` can read
+`/products/` on its own; it just no longer competes for the URL routing.
 
 ## MissAV mirrors and the 403 trap
 
