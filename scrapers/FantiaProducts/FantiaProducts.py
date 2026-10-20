@@ -63,6 +63,14 @@ fell back to the whole JSON blob, yielding tags like
 ``{event:content_viewed`` / ``fanclub_id:4147``.  Now: real tag[] when
 present, otherwise ``fanclub_category`` (e.g. ``コスプレ``), otherwise nothing.
 
+Studio policy (fixed 2026-10-20)
+--------------------------------
+The schema.org ``Product.brand.name`` is the creator's circle/club name --
+that IS the studio.  It used to be demoted to ``director`` while ``studio``
+held a constant ``Fantia.jp``.  Now studio gets the circle name, the site
+constant remains only as a fallback when brand is absent, and the redundant
+``director`` mapping is gone.
+
 Date policy
 -----------
 fantia.jp/products/<id> exposes **no release date at all** -- verified live
@@ -706,7 +714,10 @@ def parse_product(html: str, url: str) -> dict:
     viewed = _content_viewed(blocks)
     meta = _meta_map(html)
 
-    brand = _s((product.get("brand") or {}).get("name"))
+    # schema.org Product.brand.name == the creator's circle/club name; guard
+    # the shape (dict / plain string) so an odd page can't AttributeError-crash
+    brand_obj = product.get("brand")
+    brand = _s(brand_obj.get("name")) if isinstance(brand_obj, dict) else _s(brand_obj)
     og_title = _s(meta.get("og:title"))
 
     # ---- title: schema.org name is already clean; else trim the og:title tail
@@ -800,7 +811,8 @@ def parse_product(html: str, url: str) -> dict:
     scene = {
         "title": title,
         "urls": [url] if url else (["https://fantia.jp/products/" + pid] if pid else []),
-        "studio": {"name": "Fantia.jp"},
+        # the circle name is the studio; keep the site constant as fallback
+        "studio": {"name": brand} if brand else {"name": "Fantia.jp"},
     }
     if code:
         scene["code"] = code
@@ -814,10 +826,9 @@ def parse_product(html: str, url: str) -> dict:
         scene["tags"] = [{"name": t} for t in tags]
     if performer:
         scene["performers"] = [{"name": performer}]
-    if brand:
-        scene["director"] = brand
-    _dbg("parsed id=%s code=%s date=%s tags=%d performer=%s"
-         % (pid, code, date or "-", len(tags), performer))
+    _dbg("parsed id=%s code=%s date=%s tags=%d performer=%s studio=%s"
+         % (pid, code, date or "-", len(tags), performer,
+            (scene.get("studio") or {}).get("name", "-")))
     return scene
 
 

@@ -664,7 +664,9 @@ def build(post, post_id):
         "urls": [POST_URL % post_id],
         "date": parse_date(post.get("posted_at")),
         "image": pic(post),
-        "studio": {"name": "Fantia.jp"},
+        # The fanclub creator (circle/club name) is the studio; keep the
+        # site-wide constant only when the API returns no creator_name.
+        "studio": {"name": creator} if creator else {"name": "Fantia.jp"},
         "performers": performers,
         "tags": tags,
     }
@@ -769,11 +771,16 @@ def parse_product(page):
 
     tags = [{"name": _s(t)} for t in gtm.get("tag") or [] if _s(t)]
 
+    # schema.org Product.brand.name == the creator's circle/club name
+    brand_obj = ld_product.get("brand")
+    brand = _s(brand_obj.get("name")) if isinstance(brand_obj, dict) else _s(brand_obj)
+
     return {
         "title": title,
         "details": details,
         "date": date,
         "image": image,
+        "brand": brand,
         "performers": performers,
         "tags": tags,
     }
@@ -813,6 +820,7 @@ def fetch_product(sess, product_id):
 
 
 def build_product(pdata, product_id):
+    brand = pdata.get("brand") or ""
     out = {
         "title": pdata.get("title") or "",
         "code": "FANTIA-P%s" % product_id,
@@ -820,7 +828,8 @@ def build_product(pdata, product_id):
         "urls": [PRODUCT_URL % product_id],
         "date": pdata.get("date") or "",
         "image": pdata.get("image") or "",
-        "studio": {"name": "Fantia.jp"},
+        # JSON-LD brand.name is the circle; fall back to the site constant
+        "studio": {"name": brand} if brand else {"name": "Fantia.jp"},
         "performers": pdata.get("performers") or [],
         "tags": pdata.get("tags") or [],
     }

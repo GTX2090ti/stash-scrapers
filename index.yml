@@ -18,21 +18,21 @@
 
 - id: Fantia
   name: Fantia
-  version: 1.1.0
-  date: 2026-10-19 18:01:33
+  version: 1.2.0
+  date: 2026-10-20 19:29:19
   path: zips/Fantia.zip
-  sha256: 92bc21f5003899faa4fa9355c30aa0b81c82453b150c24f971d5e0bf0c9922bb
+  sha256: ad5edb65397a9d8e991332041281f35352188c7e2d65aae9ac5b95adc2431b4d
   metadata:
-    description: fantia.jp scraper, fragment-capable rewrite of the community FantiaJp. scene+gallery by URL/fragment, tolerant of malformed post JSON. Since v1.1.0 it claims the posts namespace (fantia.jp/posts/) only, so product URLs route to the FantiaProducts package; its fragment entries still accept a product URL manually. Optional CookieCloud login via CC_COOKIECLOUD_* env for members-only posts.
+    description: fantia.jp scraper, fragment-capable rewrite of the community FantiaJp. scene+gallery by URL/fragment, tolerant of malformed post JSON. Studio is the fanclub creator name (since v1.2.0). Since v1.1.0 it claims the posts namespace (fantia.jp/posts/) only, so product URLs route to the FantiaProducts package; its fragment entries still accept a product URL manually. Optional CookieCloud login via CC_COOKIECLOUD_* env for members-only posts.
 
 - id: FantiaProducts
   name: FantiaProducts
-  version: 1.1.0
-  date: 2026-10-20 15:47:04
+  version: 1.2.0
+  date: 2026-10-20 19:29:19
   path: zips/FantiaProducts.zip
-  sha256: 7a1805f6215c849ec6cbe41b4d48b6427454bdb39b5e9d6d3d7050b49fb33abe
+  sha256: fe51f96c3501f72405fa0c3fcaad4f5ad4431d45a7768a88543020826b5f7b47
   metadata:
-    description: fantia.jp/products scraper (the shop namespace, distinct from /posts/). Products-only build with deeper field extraction (schema.org Product, unblurred image[], content_viewed tag[]/fanclub_category, catalogue-code detection, release date from the product cover image Last-Modified since fantia exposes no date field). scene+gallery by URL/fragment/query-fragment. Optional CookieCloud login via FANTIA_COOKIE or CC_COOKIECLOUD_* env for members-only products.
+    description: fantia.jp/products scraper (the shop namespace, distinct from /posts/). Products-only build with deeper field extraction (schema.org Product, unblurred image[], content_viewed tag[]/fanclub_category, catalogue-code detection, release date from the product cover image Last-Modified since fantia exposes no date field; studio is the circle name from Product.brand since v1.2.0). scene+gallery by URL/fragment/query-fragment. Optional CookieCloud login via FANTIA_COOKIE or CC_COOKIECLOUD_* env for members-only products.
 
 - id: Getchu
   name: Getchu
