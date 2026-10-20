@@ -57,6 +57,13 @@ sceneByFragment:
 # Cookies are cached in-process and on disk for CC_TTL seconds (default 3600).
 
 # Last Updated October 21, 2026
+#  - Products below id 700000 no longer come back dateless: the id map is
+#    not monotone there so no id-derived date is attempted, but the page's
+#    own VideoObject.uploadDate does not depend on the map and is now used
+#    as the answer.  The sample video is the right fallback because sellers
+#    replace cover images (sale banners etc.) but essentially never
+#    re-upload the sample -- verified live on 649825: cover Last-Modified
+#    2026-10-13 vs sample uploadDate 2024-06-19.
 #  - Studio is now the creator's circle/club name: schema.org
 #    Product.brand.name is reported as studio (the site constant "Fantia.jp"
 #    remains only as a fallback), the redundant director mapping is gone, and

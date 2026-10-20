@@ -105,8 +105,14 @@ Measured leave-one-out error against dual-signal ground truth::
 
 Below id 700000 the map is NOT monotone -- long-deleted id ranges are
 interleaved with products still on sale whose covers were re-uploaded
-(pollution up to 650 days) -- so the table starts at 700000 and older
-products get no date rather than a wrong one.
+(pollution up to 650 days) -- so the table starts at 700000 and no
+id-derived date is attempted below it.  Those products are NOT left
+dateless, though: the page's own ``VideoObject.uploadDate`` (the sample
+video) does not depend on the id map, so it is the answer there.  The
+sample video is the right fallback precisely because sellers replace
+cover images (e.g. for a new sale campaign) but essentially never
+re-upload the sample -- verified live on 649825: cover Last-Modified
+2026-10-13 (a sale banner refresh) vs sample uploadDate 2024-06-19.
 
 Past the last anchor the date is extrapolated with the trailing 14-day
 id rate, capped at 60 days; beyond that the scraper falls back to the
@@ -748,6 +754,22 @@ def _xcheck_upload(pid, got, upload_date: str) -> str:
     return older.isoformat()
 
 
+def _upload_fallback(pid, upload_date: str) -> str:
+    """The page's own sample-video date -- the only page-native signal.
+
+    Used for ids the table cannot answer for (below the monotonicity floor,
+    or past the extrapolation cap).  NOT an image header: the cover image
+    gets replaced by sellers (e.g. for a new sale campaign) while the
+    sample video is essentially never re-uploaded, so uploadDate stays
+    clean where Last-Modified does not.
+    """
+    m = _RE_ISO_DATE.match(upload_date or "")
+    if m:
+        _dbg("id %d: using VideoObject.uploadDate %s" % (pid, m.group(1)))
+        return m.group(1)
+    return ""
+
+
 def _date_from_pid(pid, upload_date: str = "") -> str:
     """Release date derived from the product id.
 
@@ -756,12 +778,14 @@ def _date_from_pid(pid, upload_date: str = "") -> str:
     monotone (if locally uneven) mapping.  We interpolate a calibrated
     anchor table; see the module docstring for provenance and accuracy.
 
-    When the page also carries a VideoObject.uploadDate it cross-checks the
-    result: a disagreement of more than _ID_DATE_XCHECK_DAYS days means one
-    of the two signals is structurally wrong, and the older date wins.
+    Two reconciliations with the page's VideoObject.uploadDate:
+      * inside the table's coverage it cross-checks the result -- a
+        disagreement of more than _ID_DATE_XCHECK_DAYS days means one of
+        the two signals is structurally wrong, and the older date wins;
+      * below the floor (where the id map is not monotone) or past the
+        extrapolation cap the uploadDate IS the answer.
 
-    Returns YYYY-MM-DD, or "" when the id is outside the table's
-    trustworthy range and no uploadDate is available.
+    Returns YYYY-MM-DD, or "" when neither signal is available.
     """
     try:
         pid = int(str(pid).strip())
@@ -770,8 +794,14 @@ def _date_from_pid(pid, upload_date: str = "") -> str:
     if pid <= 0:
         return ""
     if pid < _ID_DATE_FLOOR:
-        _dbg("id %d < floor %d: id-based date refused" % (pid, _ID_DATE_FLOOR))
-        return ""
+        # The id -> date map is NOT monotone below the floor, so there is
+        # no id-derived date here -- but the page's own sample-video date
+        # does not depend on the map, so fall back to it rather than
+        # emitting nothing.  (Returning "" outright would leave every
+        # pre-700000 product dateless even when the page carries a date.)
+        _dbg("id %d < floor %d: id-based date refused; falling back to"
+             " VideoObject.uploadDate" % (pid, _ID_DATE_FLOOR))
+        return _upload_fallback(pid, upload_date)
 
     table = _id_date_table()
     if not table:
@@ -817,14 +847,9 @@ def _date_from_pid(pid, upload_date: str = "") -> str:
             _dbg("id %d is %.0f d past the table (cap %d d), falling back"
                  % (pid, ahead, _ID_DATE_EXTRAPOLATE_DAYS))
 
-    # ---- outside coverage: the page's own sample-video date is the only
-    #      page-native fallback left (NOT an image header).
-    m = _RE_ISO_DATE.match(upload_date or "")
-    if m:
-        _dbg("id %d outside table coverage; using VideoObject.uploadDate %s"
-             % (pid, m.group(1)))
-        return m.group(1)
-    return ""
+    # ---- outside coverage (past the extrapolation cap): the page's own
+    #      sample-video date is the only page-native fallback left.
+    return _upload_fallback(pid, upload_date)
 
 
 def parse_product(html: str, url: str) -> dict:
@@ -930,9 +955,10 @@ def parse_product(html: str, url: str) -> dict:
     # ---- date: fantia.jp publishes no release date on the product page, so
     #      it is derived from the product id via the calibrated anchor table
     #      (see _date_from_pid and the module docstring).  No image header is
-    #      read.  VideoObject.uploadDate is the fallback for ids outside the
-    #      table's coverage, and inside it the cross-check partner: when the
-    #      two disagree by more than 30 days the older date wins.
+    #      read.  VideoObject.uploadDate is the answer below the table's
+    #      floor / past its extrapolation cap, and inside the coverage it is
+    #      the cross-check partner: when the two disagree by more than 30
+    #      days the older date wins.
     video = _find_blocks(blocks, "VideoObject")
     upload_date = _s(video.get("uploadDate"))
     date = _date_from_pid(pid, upload_date)

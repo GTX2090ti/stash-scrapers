@@ -27,12 +27,12 @@
 
 - id: FantiaProducts
   name: FantiaProducts
-  version: 1.2.1
-  date: 2026-10-21 03:34:28
+  version: 1.2.2
+  date: 2026-10-21 03:54:31
   path: zips/FantiaProducts.zip
-  sha256: 9d65dafe617027cb7ed147ca68ce972e3ea030c52b3a1a4ad19aafcf780e2b4f
+  sha256: 33ec37ec66bb873f4b38adcb396ae825c05f6fbc214c3876d4181b0c8ed88333
   metadata:
-    description: fantia.jp/products scraper (the shop namespace, distinct from /posts/). Products-only build with deeper field extraction (schema.org Product, unblurred image[], content_viewed tag[]/fanclub_category, catalogue-code detection, studio is the circle name from Product.brand since v1.2.0). Release date is derived from the product id via a calibrated 221-anchor table (fantia exposes no date field; measured accuracy median 0d / p90 1d for id >= 1000000), cross-checked against the page's sample-video date with the older date winning when they disagree by more than 30 days. scene+gallery by URL/fragment/query-fragment. Optional CookieCloud login via FANTIA_COOKIE or CC_COOKIECLOUD_* env for members-only products.
+    description: fantia.jp/products scraper (the shop namespace, distinct from /posts/). Products-only build with deeper field extraction (schema.org Product, unblurred image[], content_viewed tag[]/fanclub_category, catalogue-code detection, studio is the circle name from Product.brand since v1.2.0). Release date is derived from the product id via a calibrated 221-anchor table (fantia exposes no date field; measured accuracy median 0d / p90 1d for id >= 1000000), cross-checked against the page's sample-video date with the older date winning when they disagree by more than 30 days; below id 700000 (non-monotone map) and past the extrapolation cap the sample-video date is the answer. scene+gallery by URL/fragment/query-fragment. Optional CookieCloud login via FANTIA_COOKIE or CC_COOKIECLOUD_* env for members-only products.
 
 - id: Getchu
   name: Getchu
