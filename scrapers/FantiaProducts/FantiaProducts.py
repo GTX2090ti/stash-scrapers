@@ -63,6 +63,29 @@ fell back to the whole JSON blob, yielding tags like
 ``{event:content_viewed`` / ``fanclub_id:4147``.  Now: real tag[] when
 present, otherwise ``fanclub_category`` (e.g. ``コスプレ``), otherwise nothing.
 
+Date policy
+-----------
+fantia.jp/products/<id> exposes **no release date at all** -- verified live
+on 2026-10-20: no ``datePublished`` / ``releaseDate`` in the schema.org
+Product block, no ``og:updated_time``, no date-bearing ``itemprop``, no
+``window.__INITIAL_STATE__``, and ``/api/products/<id>`` is a 404.  The only
+ISO date in the document is the *logged-in account*'s
+``membership_registration_date`` -- the USER's signup date, never the
+product's, and it must never be scraped.
+
+So the date is derived from the product's own cover image: the HTTP
+``Last-Modified`` of ``c.fantia.jp/uploads/product/image/<product_id>/...``
+is the moment that image was uploaded, i.e. the moment the product was
+published.  It is strictly monotonic in the product id (500000 -> 2024-01-30,
+700000 -> 2024-09-12, 800000 -> 2025-03-21, 1060000 -> 2026-09-05), so it
+is a faithful stand-in for the release date.  It is read for free from the
+cover-image GET that already happens for the poster.
+
+Fallback: schema.org ``VideoObject.uploadDate``.  That is the date of the
+*sample video*, not of the product, and it drifts when a sample is
+re-uploaded (products/800000 reports 2026-10-13 while its cover says
+2025-03-21), so it is only used when no cover image is available.
+
 Proxy
 -----
 Resolution order, first hit wins:
@@ -99,6 +122,7 @@ _RE_OG_URL_PROD = re.compile(r"fantia\.jp/products/(\d+)")
 _RE_CODE_P = re.compile(r"^FANTIA-P(\d+)$", re.I)
 _RE_TAGGED_ID = re.compile(r"(?:fantia|products?)[-_\s]*(\d{5,})", re.I)
 _RE_BARE_ID = re.compile(r"^(\d{5,})$")
+_RE_ISO_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 _MEDIA_EXT = (".mp4", ".mkv", ".avi", ".wmv", ".mov", ".m4v", ".ts", ".webm",
               ".flv", ".rmvb", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".zip", ".rar", ".7z")
 
@@ -587,6 +611,85 @@ def _catalogue_code(text: str) -> str:
     return ""
 
 
+# ------------------------------------------------------------------- date
+# fantia.jp/products/<id> has NO release-date field.  Verified against the
+# live site on 2026-10-20:
+#   * schema.org Product block  -> no datePublished / releaseDate
+#   * <meta> tags               -> no og:updated_time / article:published_time
+#   * microdata itemprop        -> only name / position / item / itemListElement
+#   * window.__INITIAL_STATE__  -> not present
+#   * /api/products/<id> and friends -> 404
+#   * the only ISO date in the whole document is the *account*'s
+#     membership_registration_date (2022-04-02 here) -- the LOGGED-IN USER's
+#     signup date, NOT the product's.  It must never be used.
+#
+# What IS available:
+#   1. HTTP Last-Modified of the product's own cover image
+#      (c.fantia.jp/uploads/product/image/<product_id>/...).  That is the
+#      moment the image was uploaded, i.e. the moment the product was
+#      published.  Empirically strictly monotonic in the product id:
+#          500000 -> 2024-01-30   700000 -> 2024-09-12
+#          800000 -> 2025-03-21  1040000-ish band -> 2026-09-05
+#      so it is a faithful stand-in for the release date.
+#   2. schema.org VideoObject.uploadDate -- the date of the *sample video*,
+#      NOT the product.  It is a usable fallback but it drifts: a product
+#      whose sample was re-uploaded later reports the later date
+#      (products/800000 -> 2026-10-13 while its cover says 2025-03-21).
+#      Therefore: cover Last-Modified wins, uploadDate is only the fallback.
+#
+# The result is written to Stash's scene "date" field as YYYY-MM-DD.
+
+def _http_last_modified(url: str) -> str:
+    """HEAD the url and return its Last-Modified as YYYY-MM-DD ("" if none)."""
+    if not url:
+        return ""
+    try:
+        proxy = _resolve_proxy()
+        req = urllib.request.Request(url, method="HEAD", headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"})
+        with _opener(proxy).open(req, timeout=int(
+                os.environ.get("FANTIAPROD_TIMEOUT") or DEFAULT_TIMEOUT)) as resp:
+            raw = resp.headers.get("Last-Modified") or ""
+        if not raw:
+            return ""
+        import email.utils
+        return email.utils.parsedate_to_datetime(raw).strftime("%Y-%m-%d")
+    except Exception as exc:  # noqa: BLE001
+        _dbg("HEAD %s failed: %r" % (url[:90], exc))
+        return ""
+
+
+def _extract_date(blocks: list, image_urls: list, product: dict,
+                  image_lm: str = "") -> str:
+    """Best-effort product release date, "" when nothing is available."""
+    # 1) cover image Last-Modified == when the product was published.
+    #    The GET we already did for the cover gives it for free.
+    if image_lm and "/uploads/product/image/" in (image_urls[0] if image_urls else ""):
+        _dbg("date from cover image Last-Modified: %s" % image_lm)
+        return image_lm
+    for url in image_urls:
+        if "/uploads/product/image/" in url:
+            got = _http_last_modified(url)
+            if got:
+                _dbg("date from cover image Last-Modified (HEAD): %s" % got)
+                return got
+    # 2) fallback: the sample video's upload date
+    video = _find_blocks(blocks, "VideoObject")
+    got = _s(video.get("uploadDate"))
+    m = _RE_ISO_DATE.match(got)
+    if m:
+        _dbg("date from VideoObject.uploadDate: %s" % m.group(1))
+        return m.group(1)
+    # 3) last resort: any datePublished / releaseDate that may appear later
+    for key in ("datePublished", "releaseDate", "publicationDate"):
+        m = _RE_ISO_DATE.match(_s(product.get(key)))
+        if m:
+            _dbg("date from Product.%s: %s" % (key, m.group(1)))
+            return m.group(1)
+    return ""
+
+
 def parse_product(html: str, url: str) -> dict:
     if not html:
         return {}
@@ -629,18 +732,25 @@ def parse_product(html: str, url: str) -> dict:
 
     # ---- image: JSON-LD image[] is the UNBLURRED original
     image_url = ""
+    image_urls = []
     images = product.get("image")
     if isinstance(images, list):
         for item in images:
             got = _s(item)
             if got:
-                image_url = got
-                break
+                image_urls.append(got)
+        if image_urls:
+            image_url = image_urls[0]
     else:
         image_url = _s(images)
+        if image_url:
+            image_urls.append(image_url)
     if not image_url:
         image_url = _s(meta.get("og:image")).replace("blurred_ogp_", "")
+        if image_url:
+            image_urls.append(image_url)
     image = ""
+    image_lm = ""          # Last-Modified of the cover image == publish date
     if image_url:
         try:
             proxy = _resolve_proxy()
@@ -650,6 +760,10 @@ def parse_product(html: str, url: str) -> dict:
             with _opener(proxy).open(req, timeout=int(
                     os.environ.get("FANTIAPROD_TIMEOUT") or DEFAULT_TIMEOUT)) as resp:
                 blob = resp.read()
+                raw_lm = resp.headers.get("Last-Modified") or ""
+            if raw_lm:
+                import email.utils
+                image_lm = email.utils.parsedate_to_datetime(raw_lm).strftime("%Y-%m-%d")
             if blob:
                 image = "data:image/jpeg;base64," + base64.b64encode(blob).decode("ascii")
         except Exception as exc:  # noqa: BLE001
@@ -678,6 +792,11 @@ def parse_product(html: str, url: str) -> dict:
     if pm:
         performer = pm.group(1).strip()
 
+    # ---- date: fantia exposes no release-date field, so we use the cover
+    #      image's Last-Modified (== when the product was published), with the
+    #      sample video's uploadDate as a fallback.  See _extract_date().
+    date = _extract_date(blocks, image_urls, product, image_lm)
+
     scene = {
         "title": title,
         "urls": [url] if url else (["https://fantia.jp/products/" + pid] if pid else []),
@@ -685,6 +804,8 @@ def parse_product(html: str, url: str) -> dict:
     }
     if code:
         scene["code"] = code
+    if date:
+        scene["date"] = date
     if details:
         scene["details"] = details
     if image:
@@ -695,7 +816,8 @@ def parse_product(html: str, url: str) -> dict:
         scene["performers"] = [{"name": performer}]
     if brand:
         scene["director"] = brand
-    _dbg("parsed id=%s code=%s tags=%d performer=%s" % (pid, code, len(tags), performer))
+    _dbg("parsed id=%s code=%s date=%s tags=%d performer=%s"
+         % (pid, code, date or "-", len(tags), performer))
     return scene
 
 

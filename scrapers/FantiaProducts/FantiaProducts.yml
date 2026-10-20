@@ -56,7 +56,14 @@ sceneByFragment:
 # HTTPS_PROXY / HTTP_PROXY / ALL_PROXY, or a FantiaProducts.proxy file.
 # Cookies are cached in-process and on disk for CC_TTL seconds (default 3600).
 
-# Last Updated October 19, 2026
+# Last Updated October 20, 2026
+#  - Release date is now scraped: fantia.jp exposes no date field at all, so the
+#    product's own cover image Last-Modified (c.fantia.jp/uploads/product/image/
+#    <id>/...) is used -- that is the moment the product was published, and it
+#    is strictly monotonic in the product id. Falls back to the sample video's
+#    VideoObject.uploadDate when no cover image is available. The logged-in
+#    account's membership_registration_date is NEVER used (it is the user's
+#    signup date, not the product's).
 #  - CookieCloud login support (FANTIA_COOKIE env or CC_COOKIECLOUD_* env),
 #    with in-process + on-disk caching; members-only products now scrape
 #  - Code no longer falls back to the whole og:title when 【...】 is absent

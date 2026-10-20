@@ -27,12 +27,12 @@
 
 - id: FantiaProducts
   name: FantiaProducts
-  version: 1.0.0
-  date: 2026-10-19 15:55:39
+  version: 1.1.0
+  date: 2026-10-20 15:47:04
   path: zips/FantiaProducts.zip
-  sha256: 8594d1e1e02031deb64ad48406573df5d2ccf48f214332b0de86db32fa7e69b8
+  sha256: 7a1805f6215c849ec6cbe41b4d48b6427454bdb39b5e9d6d3d7050b49fb33abe
   metadata:
-    description: fantia.jp/products scraper (the shop namespace, distinct from /posts/). Products-only build with deeper field extraction (schema.org Product, unblurred image[], content_viewed tag[]/fanclub_category, catalogue-code detection). scene+gallery by URL/fragment/query-fragment. Optional CookieCloud login via FANTIA_COOKIE or CC_COOKIECLOUD_* env for members-only products.
+    description: fantia.jp/products scraper (the shop namespace, distinct from /posts/). Products-only build with deeper field extraction (schema.org Product, unblurred image[], content_viewed tag[]/fanclub_category, catalogue-code detection, release date from the product cover image Last-Modified since fantia exposes no date field). scene+gallery by URL/fragment/query-fragment. Optional CookieCloud login via FANTIA_COOKIE or CC_COOKIECLOUD_* env for members-only products.
 
 - id: Getchu
   name: Getchu
