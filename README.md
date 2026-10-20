@@ -10,7 +10,7 @@ Personal Stash scrapers maintained by [@GTX2090ti](https://github.com/GTX2090ti)
 | **GetchuDL** | [dl.getchu.com](https://dl.getchu.com) | Scene & Gallery: name / URL / fragment / query-fragment. Full-text search on dl.getchu.com (EUC-JP encoding handled). |
 | **Getchu** | [www.getchu.com](https://www.getchu.com) | Scene: URL / fragment. **Physical goods** (DVD / Blu-ray / CD / games / doujin) — the counterpart to GetchuDL, which covers the digital-only dl.getchu.com. No name search (getchu's search endpoint 403s non-browser requests). Handles the R18 age gate and EUC-JP / JIS X 0213 decoding. Pure stdlib. |
 | **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment for **creator posts** (`/posts/<id>`). Fragment-capable build — shows up in *Scrape with…* and supports batch. Since **v1.1.0** it claims the posts namespace only, so `Search by URL` on a product routes to **FantiaProducts** instead of colliding with it. Optional CookieCloud login for members-only posts. |
-| **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment / query-fragment, **products namespace only** (`/products/<id>`). The products-specialised build: deeper field extraction (schema.org `Product`, unblurred `image[]`, `content_viewed` `tag[]` / `fanclub_category`, catalogue-code detection) and code `FANTIA-P<id>` that never collides with post ids. Since **v1.1.0** it also scrapes the release date (from the product cover image's `Last-Modified`, since fantia exposes no date field). Optional CookieCloud login for members-only products. |
+| **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment / query-fragment, **products namespace only** (`/products/<id>`). The products-specialised build: deeper field extraction (schema.org `Product`, unblurred `image[]`, `content_viewed` `tag[]` / `fanclub_category`, catalogue-code detection) and code `FANTIA-P<id>` that never collides with post ids. Studio is the circle name from `Product.brand`. Since **v1.2.0** the release date is derived from the product id via a calibrated anchor table (fantia exposes no date field; median error 0d, p90 1d for id ≥ 1000000). Since **v1.2.1** the id-derived date is cross-checked against the page's sample-video date: a disagreement of more than 30 days resolves to the older date. Optional CookieCloud login for members-only products. |
 | **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene: name / URL / fragment / query-fragment; Performer: name / URL. Fragment-capable rewrite of the community `MissAV_en` / `MissAV_jp`. Parses **both** the `en` and `zh-CN` locales, cycles mirrors, normalises stored scene URLs, and fills in performers from the page's `Actress:` / `女优:` row (the community build's `og:video:actor` XPath no longer matches anything). Pure stdlib. |
 
 ## Install via Stash (recommended)
@@ -90,21 +90,53 @@ puts behind one numeric id, and since **v1.1.0** the two no longer overlap:
 | URL | Routed to | Why |
 |---|---|---|
 | `fantia.jp/posts/<id>` | **Fantia** | JSON API (`/api/v1/posts/<id>`), tolerant of malformed post JSON |
-| `fantia.jp/products/<id>` | **FantiaProducts** | HTML scrape with deeper field extraction (schema.org `Product`, unblurred `image[]`, `content_viewed` `tag[]` / `fanclub_category`, catalogue-code detection, release date) |
+| `fantia.jp/products/<id>` | **FantiaProducts** | HTML scrape with deeper field extraction (schema.org `Product`, unblurred `image[]`, `content_viewed` `tag[]` / `fanclub_category`, catalogue-code detection, id-derived release date) |
 
-**Release date on products (since v1.1.0):** fantia.jp exposes **no** release-date
-field on a product page — no `datePublished`, no `og:updated_time`, no date-bearing
-`itemprop`, and `/api/products/<id>` is a 404. The only ISO date in the document is
-the *logged-in account*'s `membership_registration_date`, i.e. the user's own signup
-date, which is never used. `FantiaProducts` therefore derives the date from the
-product's own cover image: the HTTP `Last-Modified` of
-`c.fantia.jp/uploads/product/image/<id>/...` is the moment the image was uploaded,
-i.e. the moment the product was published, and it is strictly monotonic in the
-product id (500000 → 2024-01-30, 700000 → 2024-09-12, 800000 → 2025-03-21).
-It is read for free from the cover-image GET that already happens for the poster.
-The sample video's `VideoObject.uploadDate` is only a fallback — it is the date of
-the *sample*, not of the product, and it drifts when a sample is re-uploaded
-(products/800000 reports 2026-10-13 while its cover says 2025-03-21).
+**Release date on products (since v1.1.0, id-derived since v1.2.0, cross-checked since v1.2.1):** fantia.jp
+exposes **no** release-date field on a product page — no `datePublished`, no
+`og:updated_time`, no date-bearing `itemprop`, no `window.__INITIAL_STATE__`, and
+`/api/products/<id>` is a 404 even when logged in. The only ISO date in the
+document is the *logged-in account*'s `membership_registration_date`, i.e. the
+user's own signup date, which is never used.
+
+What the page does carry is a numeric product id, and Fantia issues those
+sequentially — so id → publication date is a monotone (if locally uneven)
+mapping, with a measured density of 50…8100 ids/day. `FantiaProducts` therefore
+ships a 221-anchor `(id, date)` table and interpolates. The table was calibrated
+offline from ~1700 probed products: each anchor's date is
+`min(cover-image Last-Modified, VideoObject.uploadDate)`, because both of those
+are *upper bounds* on the publish date (an image or video is uploaded at or after
+publication, and a later replacement only pushes the date later), so the min is
+exact whenever the product has never been re-uploaded. The series is then made
+monotone with a suffix-minimum pass, which equals the truth at every clean point
+and pulls down only the polluted ones.
+
+Measured leave-one-out accuracy against dual-signal ground truth (cover
+`Last-Modified` == sample `uploadDate`):
+
+| id range | median | p90 | max |
+|---|---|---|---|
+| ≥ 1040000 | 0d | 1d | 1d |
+| ≥ 1000000 | 0d | 1d | 33d |
+| ≥ 900000 | 0d | 1d | 33d |
+| ≥ 700000 | 0d | 2d | 33d |
+
+Below id 700000 the mapping is **not** monotone — long-deleted id ranges are
+interleaved with products still on sale whose covers were re-uploaded — so the
+table starts there and older products get no date rather than a wrong one. Past
+the last anchor the date is extrapolated with the trailing 14-day id rate (capped
+at 60 days) and then falls back to the page's own `VideoObject.uploadDate`. No
+image header is read at runtime; the table is refreshed by re-running the
+calibration crawl described in the module docstring.
+
+Inside the table's coverage the page's `VideoObject.uploadDate` doubles as a
+cross-check: both dates are upper bounds on the same publish date, and every
+failure mode found in calibration (non-monotone id ranges, extrapolation drift,
+a re-uploaded sample video) pushes one of them *later*, never earlier. So when
+the two disagree by more than 30 days, one signal is structurally wrong and the
+**older** date wins; small disagreements keep the id-derived value, which is the
+more precise of the two.
+
 Posts are unaffected: `Fantia` already takes the date from the post JSON
 (`posted_at`).
 

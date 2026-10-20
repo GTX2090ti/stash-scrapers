@@ -76,23 +76,50 @@ Date policy
 fantia.jp/products/<id> exposes **no release date at all** -- verified live
 on 2026-10-20: no ``datePublished`` / ``releaseDate`` in the schema.org
 Product block, no ``og:updated_time``, no date-bearing ``itemprop``, no
-``window.__INITIAL_STATE__``, and ``/api/products/<id>`` is a 404.  The only
-ISO date in the document is the *logged-in account*'s
-``membership_registration_date`` -- the USER's signup date, never the
-product's, and it must never be scraped.
+``window.__INITIAL_STATE__``, ``/api/products/<id>`` is a 404 even when
+logged in, and the only ISO date in the document is the *logged-in
+account*'s ``membership_registration_date`` -- the USER's signup date,
+never the product's, and it must never be scraped.
 
-So the date is derived from the product's own cover image: the HTTP
-``Last-Modified`` of ``c.fantia.jp/uploads/product/image/<product_id>/...``
-is the moment that image was uploaded, i.e. the moment the product was
-published.  It is strictly monotonic in the product id (500000 -> 2024-01-30,
-700000 -> 2024-09-12, 800000 -> 2025-03-21, 1060000 -> 2026-09-05), so it
-is a faithful stand-in for the release date.  It is read for free from the
-cover-image GET that already happens for the poster.
+So the date is derived from the product's numeric id.  Fantia issues
+product ids sequentially, so id -> publication date is a monotone mapping
+with locally varying density (measured 50..8100 ids/day).  This scraper
+ships a table of ``(id, date)`` anchors and interpolates.
 
-Fallback: schema.org ``VideoObject.uploadDate``.  That is the date of the
-*sample video*, not of the product, and it drifts when a sample is
-re-uploaded (products/800000 reports 2026-10-13 while its cover says
-2025-03-21), so it is only used when no cover image is available.
+Table provenance (offline calibration, 2026-10-21, ~1700 products probed):
+each anchor's date is ``min(cover-image Last-Modified,
+VideoObject.uploadDate)``.  Both signals are UPPER BOUNDS on the publish
+date -- an image or video is uploaded at or after publication, and a later
+replacement only pushes the date later -- so the min is exact whenever the
+product has never been re-uploaded (verified 21/21 against dual-signal
+agreement).  The series is then made monotone with a suffix-minimum pass,
+which equals the truth at every clean point and pulls down only the
+polluted ones.
+
+Measured leave-one-out error against dual-signal ground truth::
+
+    id >= 1040000   median 0d   p90 1d   max 1d     (19 points)
+    id >= 1000000   median 0d   p90 1d   max 33d    (34 points)
+    id >=  900000   median 0d   p90 1d   max 33d    (46 points)
+    id >=  700000   median 0d   p90 2d   max 33d    (47 points)
+
+Below id 700000 the map is NOT monotone -- long-deleted id ranges are
+interleaved with products still on sale whose covers were re-uploaded
+(pollution up to 650 days) -- so the table starts at 700000 and older
+products get no date rather than a wrong one.
+
+Past the last anchor the date is extrapolated with the trailing 14-day
+id rate, capped at 60 days; beyond that the scraper falls back to the
+page's own ``VideoObject.uploadDate`` (the sample video, page-native --
+NOT an image header), which for a freshly published product is still
+accurate.  No image header is ever read at runtime.
+
+Inside the table's coverage the uploadDate doubles as a cross-check:
+both dates are upper bounds on the same publish date and every failure
+mode found in calibration pushes one of them later, never earlier, so a
+disagreement of more than 30 days means one signal is structurally wrong
+and the OLDER of the two wins; small disagreements keep the id-derived
+value, the more precise signal.
 
 Proxy
 -----
@@ -108,6 +135,7 @@ Tuning: ``FANTIAPROD_TIMEOUT`` (default 20), ``FANTIAPROD_DEBUG=1`` (stderr).
 from __future__ import annotations
 
 import base64
+import datetime as _dt
 import hashlib
 import json
 import os
@@ -619,82 +647,183 @@ def _catalogue_code(text: str) -> str:
     return ""
 
 
-# ------------------------------------------------------------------- date
-# fantia.jp/products/<id> has NO release-date field.  Verified against the
-# live site on 2026-10-20:
-#   * schema.org Product block  -> no datePublished / releaseDate
-#   * <meta> tags               -> no og:updated_time / article:published_time
-#   * microdata itemprop        -> only name / position / item / itemListElement
-#   * window.__INITIAL_STATE__  -> not present
-#   * /api/products/<id> and friends -> 404
-#   * the only ISO date in the whole document is the *account*'s
-#     membership_registration_date (2022-04-02 here) -- the LOGGED-IN USER's
-#     signup date, NOT the product's.  It must never be used.
-#
-# What IS available:
-#   1. HTTP Last-Modified of the product's own cover image
-#      (c.fantia.jp/uploads/product/image/<product_id>/...).  That is the
-#      moment the image was uploaded, i.e. the moment the product was
-#      published.  Empirically strictly monotonic in the product id:
-#          500000 -> 2024-01-30   700000 -> 2024-09-12
-#          800000 -> 2025-03-21  1040000-ish band -> 2026-09-05
-#      so it is a faithful stand-in for the release date.
-#   2. schema.org VideoObject.uploadDate -- the date of the *sample video*,
-#      NOT the product.  It is a usable fallback but it drifts: a product
-#      whose sample was re-uploaded later reports the later date
-#      (products/800000 -> 2026-10-13 while its cover says 2025-03-21).
-#      Therefore: cover Last-Modified wins, uploadDate is only the fallback.
-#
-# The result is written to Stash's scene "date" field as YYYY-MM-DD.
+# ------------------------------------------------------ id -> date table
+# (product id, publication date) anchors, calibrated offline on 2026-10-21
+# from ~1700 probed products.  Each anchor date is
+# min(cover-image Last-Modified, VideoObject.uploadDate) -- both are upper
+# bounds on the publish date -- then made monotone by a suffix-minimum pass.
+# See the module docstring for the measured accuracy and for why the table
+# starts at 700000.
+_ID_DATE_FLOOR = 700000            # below this the map is not monotone
+_ID_DATE_EXTRAPOLATE_DAYS = 60     # refuse to guess further past the end
+_ID_DATE_XCHECK_DAYS = 30          # id-date vs uploadDate gap => distrust both
+_ID_DATE_TABLE = (
+    "701000:20240915,704000:20240925,705000:20240929,715000:20241021,721000:20241028,732000:202"
+    "41119,738000:20241129,750000:20241214,752000:20241221,754000:20241229,780000:20250203,7840"
+    "00:20250224,787000:20250228,795000:20250301,797000:20250309,799000:20250317,800000:2025032"
+    "1,811000:20250405,813000:20250414,814000:20250418,816000:20250427,817000:20250501,827000:2"
+    "0250519,831000:20250526,847000:20250702,856000:20250712,859000:20250717,860000:20250722,86"
+    "2000:20250730,871000:20250805,872000:20250809,873000:20250813,874000:20250817,875000:20250"
+    "831,877000:20250903,887000:20250907,888000:20250915,889000:20250929,901000:20251003,902000"
+    ":20251008,904000:20251017,915000:20251101,916000:20251106,917000:20251120,920000:20251124,"
+    "921000:20251128,930000:20251203,932000:20251211,933000:20251216,934000:20251227,947000:202"
+    "60110,949000:20260117,950000:20260123,951000:20260127,960000:20260206,961200:20260208,9616"
+    "00:20260210,962400:20260214,962800:20260216,963200:20260218,963600:20260221,964400:2026022"
+    "3,964800:20260224,965200:20260226,965600:20260227,966000:20260301,974000:20260303,974400:2"
+    "0260305,974800:20260307,975000:20260308,975600:20260314,976400:20260315,977200:20260321,97"
+    "8000:20260322,978400:20260325,978800:20260326,987600:20260401,988000:20260407,989200:20260"
+    "408,989600:20260414,990800:20260415,991000:20260416,991200:20260417,992000:20260421,992400"
+    ":20260423,992800:20260425,993600:20260428,994000:20260430,1002100:20260501,1002400:2026050"
+    "2,1002550:20260503,1003250:20260506,1003600:20260509,1004050:20260510,1004250:20260511,100"
+    "4650:20260512,1005100:20260514,1005250:20260515,1005550:20260516,1005700:20260517,1005850:"
+    "20260518,1006150:20260519,1006250:20260520,1006500:20260521,1006750:20260522,1007200:20260"
+    "523,1007500:20260527,1008250:20260528,1008500:20260529,1008850:20260530,1009000:20260531,1"
+    "016500:20260601,1016800:20260602,1017100:20260603,1017550:20260605,1017700:20260606,101800"
+    "0:20260607,1018150:20260608,1018250:20260609,1018300:20260610,1018600:20260611,1018750:202"
+    "60613,1019350:20260615,1019800:20260616,1019950:20260617,1020250:20260618,1020400:20260619"
+    ",1020700:20260620,1020850:20260621,1021150:20260622,1021300:20260623,1021600:20260624,1022"
+    "050:20260625,1022200:20260626,1022500:20260627,1022650:20260628,1022800:20260629,1023250:2"
+    "0260630,1030450:20260701,1030900:20260703,1031650:20260705,1031750:20260706,1032000:202607"
+    "07,1032100:20260708,1032400:20260709,1032550:20260710,1032850:20260711,1033000:20260712,10"
+    "33250:20260713,1033450:20260714,1034350:20260718,1034500:20260719,1034800:20260720,1035000"
+    ":20260721,1035250:20260722,1035500:20260723,1035750:20260724,1036000:20260725,1036150:2026"
+    "0726,1037000:20260730,1037350:20260731,1040200:20260801,1044850:20260802,1045000:20260803,"
+    "1045450:20260805,1045750:20260807,1046000:20260808,1046350:20260809,1046500:20260810,10468"
+    "00:20260812,1047250:20260813,1047550:20260814,1048250:20260817,1048600:20260818,1049000:20"
+    "260820,1049250:20260821,1049500:20260822,1049750:20260823,1049950:20260824,1050100:2026082"
+    "5,1050400:20260826,1050700:20260827,1051150:20260829,1051600:20260831,1058950:20260901,105"
+    "9250:20260902,1059500:20260903,1059700:20260904,1060000:20260905,1060300:20260907,1060450:"
+    "20260908,1060600:20260909,1061000:20260911,1061250:20260912,1061750:20260914,1061800:20260"
+    "915,1062100:20260916,1062550:20260918,1062750:20260919,1063000:20260920,1063500:20260923,1"
+    "063900:20260924,1064050:20260925,1064500:20260927,1064800:20260928,1064950:20260929,107250"
+    "0:20261001,1072750:20261002,1073000:20261003,1073250:20261005,1073800:20261007,1074000:202"
+    "61008,1074500:20261009,1074550:20261010,1074700:20261011,1074850:20261012,1075150:20261014"
+    ",1075450:20261015,1076050:20261018,1076200:20261019,1076500:20261020"
+)
 
-def _http_last_modified(url: str) -> str:
-    """HEAD the url and return its Last-Modified as YYYY-MM-DD ("" if none)."""
-    if not url:
-        return ""
+_ID_DATE_CACHE = None
+
+
+def _id_date_table():
+    """Parse the compact anchor table once: [(id, date), ...] sorted."""
+    global _ID_DATE_CACHE
+    if _ID_DATE_CACHE is None:
+        out = []
+        for chunk in _ID_DATE_TABLE.split(","):
+            id_s, _, d_s = chunk.strip().partition(":")
+            if not id_s or len(d_s) != 8:
+                continue
+            try:
+                out.append((int(id_s),
+                            _dt.date(int(d_s[0:4]), int(d_s[4:6]), int(d_s[6:8]))))
+            except ValueError:
+                continue
+        out.sort()
+        _ID_DATE_CACHE = out
+    return _ID_DATE_CACHE
+
+
+def _xcheck_upload(pid, got, upload_date: str) -> str:
+    """Reconcile an id-derived date with the page's VideoObject.uploadDate.
+
+    Both dates are upper bounds on the same publish date, and every failure
+    mode found during calibration (non-monotone id ranges, extrapolation
+    drift, a re-uploaded sample video) pushes one of them LATER, never
+    earlier.  So when the two disagree by more than _ID_DATE_XCHECK_DAYS
+    the older one is the safer answer; small disagreements keep the
+    id-derived value, which is the more precise of the two signals.
+    """
+    m = _RE_ISO_DATE.match(upload_date or "")
+    if not m:
+        return got.isoformat()
+    d = m.group(1).replace("-", "")
+    up = _dt.date(int(d[0:4]), int(d[4:6]), int(d[6:8]))
+    gap = abs((got - up).days)
+    if gap <= _ID_DATE_XCHECK_DAYS:
+        return got.isoformat()
+    older = got if got <= up else up
+    _dbg("id %d: id-date %s vs uploadDate %s differ by %d d (> %d d)"
+         " -- taking the older %s"
+         % (pid, got, up, gap, _ID_DATE_XCHECK_DAYS, older))
+    return older.isoformat()
+
+
+def _date_from_pid(pid, upload_date: str = "") -> str:
+    """Release date derived from the product id.
+
+    fantia.jp publishes no date on /products/<id>, so the id itself is the
+    only signal: ids are issued sequentially, which makes id -> date a
+    monotone (if locally uneven) mapping.  We interpolate a calibrated
+    anchor table; see the module docstring for provenance and accuracy.
+
+    When the page also carries a VideoObject.uploadDate it cross-checks the
+    result: a disagreement of more than _ID_DATE_XCHECK_DAYS days means one
+    of the two signals is structurally wrong, and the older date wins.
+
+    Returns YYYY-MM-DD, or "" when the id is outside the table's
+    trustworthy range and no uploadDate is available.
+    """
     try:
-        proxy = _resolve_proxy()
-        req = urllib.request.Request(url, method="HEAD", headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                          "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"})
-        with _opener(proxy).open(req, timeout=int(
-                os.environ.get("FANTIAPROD_TIMEOUT") or DEFAULT_TIMEOUT)) as resp:
-            raw = resp.headers.get("Last-Modified") or ""
-        if not raw:
-            return ""
-        import email.utils
-        return email.utils.parsedate_to_datetime(raw).strftime("%Y-%m-%d")
-    except Exception as exc:  # noqa: BLE001
-        _dbg("HEAD %s failed: %r" % (url[:90], exc))
+        pid = int(str(pid).strip())
+    except (TypeError, ValueError):
+        return ""
+    if pid <= 0:
+        return ""
+    if pid < _ID_DATE_FLOOR:
+        _dbg("id %d < floor %d: id-based date refused" % (pid, _ID_DATE_FLOOR))
         return ""
 
+    table = _id_date_table()
+    if not table:
+        return ""
 
-def _extract_date(blocks: list, image_urls: list, product: dict,
-                  image_lm: str = "") -> str:
-    """Best-effort product release date, "" when nothing is available."""
-    # 1) cover image Last-Modified == when the product was published.
-    #    The GET we already did for the cover gives it for free.
-    if image_lm and "/uploads/product/image/" in (image_urls[0] if image_urls else ""):
-        _dbg("date from cover image Last-Modified: %s" % image_lm)
-        return image_lm
-    for url in image_urls:
-        if "/uploads/product/image/" in url:
-            got = _http_last_modified(url)
-            if got:
-                _dbg("date from cover image Last-Modified (HEAD): %s" % got)
-                return got
-    # 2) fallback: the sample video's upload date
-    video = _find_blocks(blocks, "VideoObject")
-    got = _s(video.get("uploadDate"))
-    m = _RE_ISO_DATE.match(got)
+    if pid <= table[-1][0]:
+        # ---- bracketed by two anchors: piecewise-linear in id
+        lo, hi = 0, len(table) - 1
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            if table[mid][0] <= pid:
+                lo = mid
+            else:
+                hi = mid
+        a_id, a_d = table[lo]
+        b_id, b_d = table[hi]
+        if b_id == a_id or pid == a_id:
+            got = a_d
+        elif pid == b_id:
+            got = b_d
+        else:
+            frac = (pid - a_id) / float(b_id - a_id)
+            got = a_d + _dt.timedelta(days=frac * (b_d - a_d).days)
+        _dbg("date from id table: id=%d -> %s (anchors %d/%s .. %d/%s)"
+             % (pid, got, a_id, a_d, b_id, b_d))
+        return _xcheck_upload(pid, got, upload_date)
+
+    # ---- past the last anchor: extrapolate with the trailing 14-day rate
+    last_id, last_d = table[-1]
+    window_start = last_d - _dt.timedelta(days=14)
+    tail = [a for a in table if a[1] >= window_start]
+    if len(tail) >= 2:
+        a_id, a_d = tail[0]
+        span = (last_d - a_d).days
+        if span > 0 and last_id > a_id:
+            rate = (last_id - a_id) / float(span)          # ids per day
+            ahead = (pid - last_id) / rate                 # days past the end
+            if ahead <= _ID_DATE_EXTRAPOLATE_DAYS:
+                got = last_d + _dt.timedelta(days=ahead)
+                _dbg("date from id table (extrapolated %.1f d): id=%d -> %s"
+                     % (ahead, pid, got))
+                return _xcheck_upload(pid, got, upload_date)
+            _dbg("id %d is %.0f d past the table (cap %d d), falling back"
+                 % (pid, ahead, _ID_DATE_EXTRAPOLATE_DAYS))
+
+    # ---- outside coverage: the page's own sample-video date is the only
+    #      page-native fallback left (NOT an image header).
+    m = _RE_ISO_DATE.match(upload_date or "")
     if m:
-        _dbg("date from VideoObject.uploadDate: %s" % m.group(1))
+        _dbg("id %d outside table coverage; using VideoObject.uploadDate %s"
+             % (pid, m.group(1)))
         return m.group(1)
-    # 3) last resort: any datePublished / releaseDate that may appear later
-    for key in ("datePublished", "releaseDate", "publicationDate"):
-        m = _RE_ISO_DATE.match(_s(product.get(key)))
-        if m:
-            _dbg("date from Product.%s: %s" % (key, m.group(1)))
-            return m.group(1)
     return ""
 
 
@@ -761,7 +890,6 @@ def parse_product(html: str, url: str) -> dict:
         if image_url:
             image_urls.append(image_url)
     image = ""
-    image_lm = ""          # Last-Modified of the cover image == publish date
     if image_url:
         try:
             proxy = _resolve_proxy()
@@ -771,10 +899,6 @@ def parse_product(html: str, url: str) -> dict:
             with _opener(proxy).open(req, timeout=int(
                     os.environ.get("FANTIAPROD_TIMEOUT") or DEFAULT_TIMEOUT)) as resp:
                 blob = resp.read()
-                raw_lm = resp.headers.get("Last-Modified") or ""
-            if raw_lm:
-                import email.utils
-                image_lm = email.utils.parsedate_to_datetime(raw_lm).strftime("%Y-%m-%d")
             if blob:
                 image = "data:image/jpeg;base64," + base64.b64encode(blob).decode("ascii")
         except Exception as exc:  # noqa: BLE001
@@ -803,10 +927,15 @@ def parse_product(html: str, url: str) -> dict:
     if pm:
         performer = pm.group(1).strip()
 
-    # ---- date: fantia exposes no release-date field, so we use the cover
-    #      image's Last-Modified (== when the product was published), with the
-    #      sample video's uploadDate as a fallback.  See _extract_date().
-    date = _extract_date(blocks, image_urls, product, image_lm)
+    # ---- date: fantia.jp publishes no release date on the product page, so
+    #      it is derived from the product id via the calibrated anchor table
+    #      (see _date_from_pid and the module docstring).  No image header is
+    #      read.  VideoObject.uploadDate is the fallback for ids outside the
+    #      table's coverage, and inside it the cross-check partner: when the
+    #      two disagree by more than 30 days the older date wins.
+    video = _find_blocks(blocks, "VideoObject")
+    upload_date = _s(video.get("uploadDate"))
+    date = _date_from_pid(pid, upload_date)
 
     scene = {
         "title": title,

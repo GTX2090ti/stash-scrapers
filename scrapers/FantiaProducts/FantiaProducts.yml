@@ -56,14 +56,39 @@ sceneByFragment:
 # HTTPS_PROXY / HTTP_PROXY / ALL_PROXY, or a FantiaProducts.proxy file.
 # Cookies are cached in-process and on disk for CC_TTL seconds (default 3600).
 
-# Last Updated October 20, 2026
-#  - Release date is now scraped: fantia.jp exposes no date field at all, so the
-#    product's own cover image Last-Modified (c.fantia.jp/uploads/product/image/
-#    <id>/...) is used -- that is the moment the product was published, and it
-#    is strictly monotonic in the product id. Falls back to the sample video's
-#    VideoObject.uploadDate when no cover image is available. The logged-in
-#    account's membership_registration_date is NEVER used (it is the user's
-#    signup date, not the product's).
+# Last Updated October 21, 2026
+#  - Studio is now the creator's circle/club name: schema.org
+#    Product.brand.name is reported as studio (the site constant "Fantia.jp"
+#    remains only as a fallback), the redundant director mapping is gone, and
+#    brand extraction is guarded against non-dict shapes.  (Merged from the
+#    v1.2.0 studio release.)
+#  - Cross-check (user rule): when the page also carries a
+#    VideoObject.uploadDate and it disagrees with the id-derived date by more
+#    than 30 days, the OLDER of the two wins.  Both signals are upper bounds
+#    on the publish date and every failure mode found in calibration
+#    (non-monotone id ranges, extrapolation drift, a re-uploaded sample
+#    video) pushes one of them later, never earlier -- so a large gap means
+#    one signal is structurally wrong and the older date is the safer answer.
+#    Small disagreements (<= 30 days) keep the id-derived value, which is the
+#    more precise of the two.
+#  - Release date is now derived from the product's numeric id.  fantia.jp
+#    exposes no date field at all (no datePublished, no og:updated_time, no
+#    date itemprop, no __INITIAL_STATE__, /api/products/<id> is 404 even when
+#    logged in -- and the only ISO date in the page is the logged-in account's
+#    membership_registration_date, i.e. the USER's signup date, which is never
+#    used).  Product ids are issued sequentially, so id -> publication date is
+#    a monotone mapping; the scraper ships a 221-anchor table calibrated
+#    offline from ~1700 probed products (each anchor = min(cover-image
+#    Last-Modified, VideoObject.uploadDate), both upper bounds on the publish
+#    date, then made monotone by a suffix-minimum pass) and interpolates.
+#    Measured leave-one-out accuracy vs dual-signal ground truth:
+#      id >= 1040000  median 0d  p90 1d  max 1d
+#      id >= 1000000  median 0d  p90 1d  max 33d
+#      id >=  700000  median 0d  p90 2d  max 33d
+#    Below id 700000 the map is not monotone, so older products get no date
+#    rather than a wrong one.  Past the last anchor the date is extrapolated
+#    with the trailing 14-day id rate (cap 60 days), then falls back to the
+#    page's own VideoObject.uploadDate.  No image header is read at runtime.
 #  - CookieCloud login support (FANTIA_COOKIE env or CC_COOKIECLOUD_* env),
 #    with in-process + on-disk caching; members-only products now scrape
 #  - Code no longer falls back to the whole og:title when 【...】 is absent
