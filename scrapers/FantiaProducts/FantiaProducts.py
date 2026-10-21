@@ -114,6 +114,14 @@ cover images (e.g. for a new sale campaign) but essentially never
 re-upload the sample -- verified live on 649825: cover Last-Modified
 2026-10-13 (a sale banner refresh) vs sample uploadDate 2024-06-19.
 
+Below the floor the Wayback Machine supplies a second independent upper
+bound: the earliest HTTP 200 capture of ``fantia.jp/products/<id>`` (CDX
+API) cannot predate publication.  It is combined with the sample-video
+date by taking the older of the two -- both are upper bounds, so the older
+one is the closer.  Coverage is partial: a product with no snapshot and
+no sample video stays dateless.  (597174 has no sample video; its first
+capture, 2024-03-24, is the date it gets.)
+
 Past the last anchor the date is extrapolated with the trailing 14-day
 id rate, capped at 60 days; beyond that the scraper falls back to the
 page's own ``VideoObject.uploadDate`` (the sample video, page-native --
@@ -135,7 +143,8 @@ Resolution order, first hit wins:
   3. ``HTTPS_PROXY`` / ``HTTP_PROXY`` / ``ALL_PROXY`` (either case)
   4. direct
 
-Tuning: ``FANTIAPROD_TIMEOUT`` (default 20), ``FANTIAPROD_DEBUG=1`` (stderr).
+Tuning: ``FANTIAPROD_TIMEOUT`` (default 20), ``FANTIAPROD_WAYBACK_TIMEOUT``
+(default 10), ``FANTIAPROD_DEBUG=1`` (stderr).
 """
 
 from __future__ import annotations
@@ -754,6 +763,52 @@ def _xcheck_upload(pid, got, upload_date: str) -> str:
     return older.isoformat()
 
 
+_WAYBACK_CDX = "https://web.archive.org/cdx/search/cdx"
+_WAYBACK_TIMEOUT = float(os.environ.get("FANTIAPROD_WAYBACK_TIMEOUT") or 10)
+_WAYBACK_ROWS = 100
+_WAYBACK_CACHE = {}
+
+
+def _wayback_date(pid):
+    """Earliest Wayback capture of the product URL as YYYY-MM-DD, or "".
+
+    The first capture cannot predate publication, so it is an upper bound
+    on the release date -- the only signal left when a below-floor page has
+    no sample video.  Best-effort: archive.org being slow/down must never
+    turn a successful scrape into a failure.
+    """
+    if pid in _WAYBACK_CACHE:
+        return _WAYBACK_CACHE[pid]
+    got = ""
+    try:
+        qs = urllib.parse.urlencode({
+            "url": "fantia.jp/products/%d" % pid,
+            "output": "json",
+            "fl": "timestamp,original",
+            "filter": "statuscode:200",
+            "limit": str(_WAYBACK_ROWS),
+        }, safe=":/")
+        req = urllib.request.Request(_WAYBACK_CDX + "?" + qs, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with _opener(_resolve_proxy()).open(req, timeout=_WAYBACK_TIMEOUT) as resp:
+            rows = json.loads(resp.read().decode("utf-8", "replace"))
+        # CDX is prefix-matched by default; keep only this exact product.
+        want = re.compile(r"^https?://fantia\.jp/products/%d(?:[/?#]|$)" % pid)
+        for row in rows[1:]:
+            if len(row) < 2 or not want.match(str(row[1])):
+                continue
+            ts = str(row[0])
+            if len(ts) >= 8:
+                d = _dt.date(int(ts[0:4]), int(ts[4:6]), int(ts[6:8]))
+                got = d.isoformat()
+                _dbg("id %d: wayback first capture %s" % (pid, got))
+                break
+    except Exception as exc:  # noqa: BLE001 - archive.org is best-effort
+        _dbg("id %d: wayback lookup failed: %r" % (pid, exc))
+    _WAYBACK_CACHE[pid] = got
+    return got
+
+
 def _upload_fallback(pid, upload_date: str) -> str:
     """The page's own sample-video date -- the only page-native signal.
 
@@ -782,10 +837,11 @@ def _date_from_pid(pid, upload_date: str = "") -> str:
       * inside the table's coverage it cross-checks the result -- a
         disagreement of more than _ID_DATE_XCHECK_DAYS days means one of
         the two signals is structurally wrong, and the older date wins;
-      * below the floor (where the id map is not monotone) or past the
-        extrapolation cap the uploadDate IS the answer.
+      * below the floor (where the id map is not monotone) the date is
+        min(uploadDate, Wayback first capture) -- both are upper bounds;
+      * past the extrapolation cap the uploadDate IS the answer.
 
-    Returns YYYY-MM-DD, or "" when neither signal is available.
+    Returns YYYY-MM-DD, or "" when no signal is available.
     """
     try:
         pid = int(str(pid).strip())
@@ -795,13 +851,19 @@ def _date_from_pid(pid, upload_date: str = "") -> str:
         return ""
     if pid < _ID_DATE_FLOOR:
         # The id -> date map is NOT monotone below the floor, so there is
-        # no id-derived date here -- but the page's own sample-video date
-        # does not depend on the map, so fall back to it rather than
-        # emitting nothing.  (Returning "" outright would leave every
-        # pre-700000 product dateless even when the page carries a date.)
-        _dbg("id %d < floor %d: id-based date refused; falling back to"
-             " VideoObject.uploadDate" % (pid, _ID_DATE_FLOOR))
-        return _upload_fallback(pid, upload_date)
+        # no id-derived date here.  Two independent upper bounds remain:
+        # the page's sample-video date and Wayback's first capture.  The
+        # older one is the closer (same rule as _xcheck_upload).
+        _dbg("id %d < floor %d: id-based date refused; using uploadDate"
+             " and wayback upper bounds" % (pid, _ID_DATE_FLOOR))
+        up = _upload_fallback(pid, upload_date)
+        wb = _wayback_date(pid)
+        if up and wb and up != wb:
+            older = min(up, wb)
+            _dbg("id %d: uploadDate %s vs wayback %s -- taking the older %s"
+                 % (pid, up, wb, older))
+            return older
+        return up or wb
 
     table = _id_date_table()
     if not table:

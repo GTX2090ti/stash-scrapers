@@ -10,7 +10,7 @@
 | **GetchuDL** | [dl.getchu.com](https://dl.getchu.com) | Scene & Gallery：名称 / URL / Fragment / 查询 Fragment。dl.getchu.com 全文搜索（自动处理 EUC-JP 编码）。 |
 | **Getchu** | [www.getchu.com](https://www.getchu.com) | Scene：URL / Fragment。**实体商品**（DVD / Blu-ray / CD / 游戏 / 同人等）—— 与覆盖纯数字版 dl.getchu.com 的 GetchuDL 互补。**不支持按名称搜索**（站内搜索对非浏览器请求直接 403）。处理 R18 年龄门与 EUC-JP / JIS X 0213 解码。纯标准库。 |
 | **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment，处理**投稿**（`/posts/<id>`）。Fragment 增强版 —— 会出现在 *Scrape with…* 菜单并支持批量。自 **v1.1.0** 起只认投稿命名空间，因此对商品 URL 做 *Search by URL* 时会自动路由到 **FantiaProducts**，不再撞车。会员限定投稿需可选地配置 CookieCloud 登录。 |
-| **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment / 查询 Fragment，**只处理商店商品命名空间**（`/products/<id>`）。products 专用版，字段提取更深（schema.org `Product`、未模糊的 `image[]`、`content_viewed` 的 `tag[]` / `fanclub_category`、商品编号识别），code 为 `FANTIA-P<id>`，与投稿 id 永不冲突。studio 取 `Product.brand` 里的社团/圈子名。自 **v1.2.0** 起发售日期改由商品 id 经标定锚点表推导（fantia 不暴露日期字段；id ≥ 100 万时误差中位 0 天、p90 1 天）。自 **v1.2.1** 起该日期会与页面自带样片日期交叉校验：两者相差超过 30 天时取较老的那个。自 **v1.2.2** 起 70 万以下的商品（id 映射非单调区间）回退页面自带样片日期，不再空手而归。会员限定商品需可选地配置 CookieCloud 登录。 |
+| **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment / 查询 Fragment，**只处理商店商品命名空间**（`/products/<id>`）。products 专用版，字段提取更深（schema.org `Product`、未模糊的 `image[]`、`content_viewed` 的 `tag[]` / `fanclub_category`、商品编号识别），code 为 `FANTIA-P<id>`，与投稿 id 永不冲突。studio 取 `Product.brand` 里的社团/圈子名。自 **v1.2.0** 起发售日期改由商品 id 经标定锚点表推导（fantia 不暴露日期字段；id ≥ 100 万时误差中位 0 天、p90 1 天）。自 **v1.2.1** 起该日期会与页面自带样片日期交叉校验：两者相差超过 30 天时取较老的那个。自 **v1.2.2** 起 70 万以下的商品（id 映射非单调区间）回退页面自带样片日期，不再空手而归；自 **v1.2.3** 起还会查 Wayback 最早快照，并与样片日期取更早者，没有样片的商品（如 597174）也能得到日期。会员限定商品需可选地配置 CookieCloud 登录。 |
 | **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene：名称 / URL / Fragment / 查询 Fragment；Performer：名称 / URL。社区版 `MissAV_en` / `MissAV_jp` 的 Fragment 增强重写。**同时解析 `en` 与 `zh-CN` 两种语言站点**，跨镜像轮询，存库 scene URL 统一归一，并从页面 `Actress:` / `女优:` 行补齐演员（社区版的 `og:video:actor` XPath 已匹配不到任何东西）。纯标准库。 |
 
 ## 通过 Stash 安装（推荐）
@@ -72,7 +72,7 @@ Fantia 会隐藏会员限定投稿 —— `/api/v1/posts/<id>` 对当前 session
 | `fantia.jp/posts/<id>` | **Fantia** | 走 JSON API（`/api/v1/posts/<id>`），容错畸形投稿 JSON |
 | `fantia.jp/products/<id>` | **FantiaProducts** | HTML 抓取，字段提取更深（schema.org `Product`、未模糊的 `image[]`、`content_viewed` 的 `tag[]` / `fanclub_category`、商品编号识别、按 id 推导的发售日期） |
 
-**商品的发售日期（v1.1.0 起，v1.2.0 改为按 id 推导，v1.2.1 增加交叉校验）：** fantia.jp 的商品页**根本不暴露**发售日期字段 —— 没有 `datePublished`、没有 `og:updated_time`、没有带日期的 `itemprop`、没有 `window.__INITIAL_STATE__`，登录态下 `/api/products/<id>` 也是 404。整页唯一的 ISO 日期是**当前登录账号**的 `membership_registration_date`，那是用户自己的注册日，绝不会被采用。
+**商品的发售日期（v1.1.0 起，v1.2.0 改为按 id 推导，v1.2.1 增加交叉校验，v1.2.3 为 70 万以下增加 Wayback 兜底）：** fantia.jp 的商品页**根本不暴露**发售日期字段 —— 没有 `datePublished`、没有 `og:updated_time`、没有带日期的 `itemprop`、没有 `window.__INITIAL_STATE__`，登录态下 `/api/products/<id>` 也是 404。整页唯一的 ISO 日期是**当前登录账号**的 `membership_registration_date`，那是用户自己的注册日，绝不会被采用。
 
 页面真正带的是商品数字 id，而 Fantia 的顺序发号意味着 id → 上架日期是一张**单调**（但局部疏密不均）的映射，实测密度 50～8100 ids/day。因此 `FantiaProducts` 内置一张 221 个 `(id, 日期)` 锚点的表并做插值。表的离线标定来自约 1700 个采样商品：每个锚点取 `min(封面图 Last-Modified, 样片 VideoObject.uploadDate)` —— 两者都是发布日的**上界**（图/视频在上架时或之后才上传，后期更换只会把日期推晚），所以只要商品没被重新上传过，min 就是精确值；随后用一遍后缀最小值把序列拉成单调，干净点保持真值，只把污染点往下拉。
 
@@ -85,7 +85,7 @@ Fantia 会隐藏会员限定投稿 —— `/api/v1/posts/<id>` 对当前 session
 | ≥ 900000 | 0d | 1d | 33d |
 | ≥ 700000 | 0d | 2d | 33d |
 
-**70 万以下不按 id 推导、但不留空**：那个区间映射并非单调（早已下架的 id 段与仍在售、封面被换过的商品交错，污染可达 650 天），因此不做 id 推导——但页面自带的 `VideoObject.uploadDate`（样片）不依赖这张映射，直接用它作为答案。选样片做兜底是对的：卖家会换封面图（比如挂新的促销横幅）却几乎不会重传样片——649825 实测印证：封面 `Last-Modified` 2026-10-13（促销换图）vs 样片 `uploadDate` 2024-06-19。超过表末锚点时按最近 14 天的 id 增速外推（上限 60 天），再不行同样回退到 `VideoObject.uploadDate`。**运行时完全不读图片响应头**；表可通过模块文档里描述的标定爬取重新生成。投稿侧不受影响：`Fantia` 本来就从投稿 JSON 的 `posted_at` 取日期。
+**70 万以下不按 id 推导，改用两个上界取更早者（v1.2.3 起含 Wayback）**：那个区间映射并非单调（早已下架的 id 段与仍在售、封面被换过的商品交错，污染可达 650 天），因此不做 id 推导。剩下两个独立的发布日**上界**：页面自带的 `VideoObject.uploadDate`（样片），以及自 v1.2.3 起通过 Wayback CDX 取到的 `fantia.jp/products/<id>` 最早 HTTP 200 快照日期。快照不可能早于上架，所以两者都只会比真实发布日更晚，取更早的那个即更接近真实值。有样片时优先信样片：卖家会换封面图（比如挂新的促销横幅）却几乎不会重传样片——649825 实测印证：封面 `Last-Modified` 2026-10-13（促销换图）vs 样片 `uploadDate` 2024-06-19。Wayback 用于页面完全没有样片的情况（597174：无 `VideoObject`，最早快照 2024-03-24）；它覆盖不全，且首快照可能比真实上架晚几个月，两个信号都没有的商品仍留空。超过表末锚点时按最近 14 天的 id 增速外推（上限 60 天），再不行同样回退到 `VideoObject.uploadDate`。**运行时完全不读图片响应头**；表可通过模块文档里描述的标定爬取重新生成。投稿侧不受影响：`Fantia` 本来就从投稿 JSON 的 `posted_at` 取日期。
 
 **交叉校验（v1.2.1 起）：** 在表覆盖范围内，页面自带的 `VideoObject.uploadDate` 同时充当校验信号 —— 两个日期都是同一个发布日的**上界**，而标定中发现的所有失效模式（id 段非单调、外推漂移、样片被重新上传）都只会把其中一个推**晚**、不会推早。因此当两者相差超过 30 天，说明其中一个信号在结构上已经不可信，此时**取较老的那个日期**；相差在 30 天以内则保留按 id 推导的值（它是两者中更精确的信号）。
 
