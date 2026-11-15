@@ -51,3 +51,12 @@
   sha256: bbf5137a3b3bb203093b3a9e7d07d45fd698ee0e3703ba8f7bee47684f63f46d
   metadata:
     description: missav.live / missav123.com scraper, fragment-capable rewrite of the community MissAV_en / MissAV_jp. scene by URL / fragment / query-fragment / name; performer by URL / name. Bilingual label parsing (en + zh-CN locales), mirror fallback, and normalised scene URLs. Optional proxy via MISSAV_PROXY env. Pure stdlib.
+
+- id: CosplayDoga
+  name: CosplayDoga
+  version: 1.0.0
+  date: 2026-11-16 00:00:00
+  path: zips/CosplayDoga.zip
+  sha256: f4438132a88f875fdc74590581b820c5fba22b41f0e52248f4385ec8627439a6
+  metadata:
+    description: cosplay-doga.net scraper (WordPress review blog, one post per cosplay AV work). Scene+gallery by URL/fragment/query-fragment. Title, publish date, in-article cover (og:image is only a 216px thumbnail), body prose with promo/related blocks stripped, tags plus category. Fragment resolves the post id from url/code/filename/title and never treats a year-like 4-digit value as an id. The page carries no product code, studio or performers, so those are left empty rather than guessed. Proxy via the standard HTTPS_PROXY / HTTP_PROXY env vars.

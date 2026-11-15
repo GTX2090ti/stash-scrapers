@@ -1,0 +1,40 @@
+name: CosplayDoga
+sceneByURL:
+  - action: script
+    url:
+      - cosplay-doga.net/post-
+    script:
+      - python3
+      - CosplayDoga.py
+      - sceneByURL
+galleryByURL:
+  - action: script
+    url:
+      - cosplay-doga.net/post-
+    script:
+      - python3
+      - CosplayDoga.py
+      - galleryByURL
+sceneByFragment:
+  action: script
+  script:
+    - python3
+    - CosplayDoga.py
+    - sceneByFragment
+galleryByFragment:
+  action: script
+  script:
+    - python3
+    - CosplayDoga.py
+    - galleryByFragment
+sceneByQueryFragment:
+  action: script
+  script:
+    - python3
+    - CosplayDoga.py
+    - sceneByQueryFragment
+# cosplay-doga.net blog posts: one page per reviewed cosplay AV work.
+# Fields on page: title / publish date / og:image cover / body text / tags.
+# No product code, studio or performer data exists on the page (not invented).
+# Requires: python3 + requests + lxml (all present in the Stash container).
+# Last Updated November 16, 2026

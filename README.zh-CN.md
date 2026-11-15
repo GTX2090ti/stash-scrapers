@@ -12,6 +12,7 @@
 | **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment，处理**投稿**（`/posts/<id>`）。Fragment 增强版 —— 会出现在 *Scrape with…* 菜单并支持批量。自 **v1.1.0** 起只认投稿命名空间，因此对商品 URL 做 *Search by URL* 时会自动路由到 **FantiaProducts**，不再撞车。会员限定投稿需可选地配置 CookieCloud 登录。 |
 | **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery：URL / Fragment / 查询 Fragment，**只处理商店商品命名空间**（`/products/<id>`）。products 专用版，字段提取更深（schema.org `Product`、未模糊的 `image[]`、`content_viewed` 的 `tag[]` / `fanclub_category`、商品编号识别），code 为 `FANTIA-P<id>`，与投稿 id 永不冲突。studio 取 `Product.brand` 里的社团/圈子名。自 **v1.2.0** 起发售日期改由商品 id 经标定锚点表推导（fantia 不暴露日期字段；id ≥ 100 万时误差中位 0 天、p90 1 天）。自 **v1.2.1** 起该日期会与页面自带样片日期交叉校验：两者相差超过 30 天时取较老的那个。自 **v1.2.2** 起 70 万以下的商品（id 映射非单调区间）回退页面自带样片日期，不再空手而归；自 **v1.2.3** 起还会查 Wayback 最早快照，并与样片日期取更早者，没有样片的商品（如 597174）也能得到日期。会员限定商品需可选地配置 CookieCloud 登录。 |
 | **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene：名称 / URL / Fragment / 查询 Fragment；Performer：名称 / URL。社区版 `MissAV_en` / `MissAV_jp` 的 Fragment 增强重写。**同时解析 `en` 与 `zh-CN` 两种语言站点**，跨镜像轮询，存库 scene URL 统一归一，并从页面 `Actress:` / `女优:` 行补齐演员（社区版的 `og:video:actor` XPath 已匹配不到任何东西）。纯标准库。 |
+| **CosplayDoga** | [cosplay-doga.net](https://www.cosplay-doga.net) | Scene & Gallery：URL / Fragment / 查询 Fragment，处理评测博客文章（`/post-<id>/`）。抓取标题、发布日期、正文内封面（og:image 只是 216px 缩略图）、正文（已剔除推广与相关推荐块）、标签加分类。Fragment 依次从 url / code / 文件名 / 标题解析 post id，`19xx` `20xx` 这类四位数年份不会被当 id。页面本身没有品番、厂商、演员，因此不臆造。代理走标准 `HTTPS_PROXY` / `HTTP_PROXY`。 |
 
 ## 通过 Stash 安装（推荐）
 
@@ -39,6 +40,7 @@
 - [`scrapers/Fantia/Fantia.yml`](scrapers/Fantia/Fantia.yml) + [`fantia.py`](scrapers/Fantia/fantia.py)
 - [`scrapers/FantiaProducts/FantiaProducts.yml`](scrapers/FantiaProducts/FantiaProducts.yml) + [`FantiaProducts.py`](scrapers/FantiaProducts/FantiaProducts.py)
 - [`scrapers/MissAV/MissAV.yml`](scrapers/MissAV/MissAV.yml) + [`missav.py`](scrapers/MissAV/missav.py)
+- [`scrapers/CosplayDoga/CosplayDoga.yml`](scrapers/CosplayDoga/CosplayDoga.yml) + [`CosplayDoga.py`](scrapers/CosplayDoga/CosplayDoga.py)
 
 然后在 Settings 里点 **Reload scrapers**。
 
@@ -122,6 +124,7 @@ MissAV 有多个镜像，行为**并不一致**，所以 yml 把两个都声明�
 - `fantia.py`：除 `requests` 外无需额外依赖；如需会员内容按上文配置 CookieCloud。其余均为标准库（CookieCloud 客户端内置纯 Python AES 兜底，不需要额外的加密库）
 - `FantiaProducts.py`：纯标准库，无需额外配置。CookieCloud 登录与 `fantia.py` 相同；如在墙内设置 `FANTIAPROD_PROXY`（或标准代理环境变量）
 - `missav.py`：纯标准库，无需额外配置；如在墙内设置 `MISSAV_PROXY`（或标准代理环境变量）
+- `CosplayDoga.py`：无需额外依赖（`requests` + `lxml`，镜像自带）；如在墙内设置 `HTTPS_PROXY` / `HTTP_PROXY`
 
 ## 版本管理
 
