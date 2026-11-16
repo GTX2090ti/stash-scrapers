@@ -12,7 +12,6 @@ Personal Stash scrapers maintained by [@GTX2090ti](https://github.com/GTX2090ti)
 | **Fantia** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment for **creator posts** (`/posts/<id>`). Fragment-capable build — shows up in *Scrape with…* and supports batch. Since **v1.1.0** it claims the posts namespace only, so `Search by URL` on a product routes to **FantiaProducts** instead of colliding with it. Optional CookieCloud login for members-only posts. |
 | **FantiaProducts** | [fantia.jp](https://fantia.jp) | Scene & Gallery: URL / fragment / query-fragment, **products namespace only** (`/products/<id>`). The products-specialised build: deeper field extraction (schema.org `Product`, unblurred `image[]`, `content_viewed` `tag[]` / `fanclub_category`, catalogue-code detection) and code `FANTIA-P<id>` that never collides with post ids. Studio is the circle name from `Product.brand`. Since **v1.2.0** the release date is derived from the product id via a calibrated anchor table (fantia exposes no date field; median error 0d, p90 1d for id ≥ 1000000). Since **v1.2.1** the id-derived date is cross-checked against the page's sample-video date: a disagreement of more than 30 days resolves to the older date. Since **v1.2.2** products below id 700000 (where the id map is not monotone) fall back to the page's sample-video date instead of coming back dateless; since **v1.2.3** they also consult the Wayback Machine's earliest capture and keep the older of the two upper bounds, so pages without a sample video (e.g. 597174) get a date too. Optional CookieCloud login for members-only products. |
 | **MissAV** | [missav.live](https://missav.live) / [missav123.com](https://missav123.com) | Scene: name / URL / fragment / query-fragment; Performer: name / URL. Fragment-capable rewrite of the community `MissAV_en` / `MissAV_jp`. Parses **both** the `en` and `zh-CN` locales, cycles mirrors, normalises stored scene URLs, and fills in performers from the page's `Actress:` / `女优:` row (the community build's `og:video:actor` XPath no longer matches anything). Pure stdlib. |
-| **CosplayDoga** | [cosplay-doga.net](https://www.cosplay-doga.net) | Scene & Gallery: URL / fragment / query-fragment for review-blog posts (`/post-<id>/`). Extracts title, publish date, in-article cover (og:image is only a 216px thumbnail), body prose with promo / related blocks stripped, tags plus category. Fragment resolves the post id from url / code / filename / title and never treats a year-like 4-digit value as an id. The page carries no product code, studio or performers, so those stay empty. Proxy via the standard `HTTPS_PROXY` / `HTTP_PROXY` env vars. |
 
 ## Install via Stash (recommended)
 
@@ -42,7 +41,6 @@ Download the scraper files and place them in your Stash `scrapers/` directory:
 - [`scrapers/Fantia/Fantia.yml`](scrapers/Fantia/Fantia.yml) + [`fantia.py`](scrapers/Fantia/fantia.py)
 - [`scrapers/FantiaProducts/FantiaProducts.yml`](scrapers/FantiaProducts/FantiaProducts.yml) + [`FantiaProducts.py`](scrapers/FantiaProducts/FantiaProducts.py)
 - [`scrapers/MissAV/MissAV.yml`](scrapers/MissAV/MissAV.yml) + [`missav.py`](scrapers/MissAV/missav.py)
-- [`scrapers/CosplayDoga/CosplayDoga.yml`](scrapers/CosplayDoga/CosplayDoga.yml) + [`CosplayDoga.py`](scrapers/CosplayDoga/CosplayDoga.py)
 
 Then click **Reload scrapers** in Settings.
 
@@ -211,8 +209,6 @@ Proxy: `MISSAV_PROXY` (scraper only), else the standard `HTTPS_PROXY` /
   login as `fantia.py`; set `FANTIAPROD_PROXY` (or the standard proxy env vars)
   if you are behind the GFW
 - `missav.py`: pure stdlib, no extra setup. Set `MISSAV_PROXY` (or the standard proxy env vars) if you are behind the GFW.
-- `CosplayDoga.py`: no extra setup (`requests` + `lxml`, both ship in the image); set `HTTPS_PROXY` / `HTTP_PROXY` if you are behind the GFW Set `MISSAV_PROXY` (or the standard
-  proxy env vars) if you are behind the GFW
 
 ## Versioning
 
